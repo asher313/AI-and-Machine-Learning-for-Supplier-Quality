@@ -1,0 +1,17 @@
+# Chapter 22 — 22.6 Security Scanning
+include:
+  - template: Jobs/SAST.gitlab-ci.yml
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
+  - template: Jobs/Dependency-Scanning.gitlab-ci.yml
+  - template: Jobs/Container-Scanning.gitlab-ci.yml
+
+# A hard gate of your own on the built image
+trivy_scan:
+  stage: test
+  image: aquasec/trivy:0.56.2
+  tags: [standard]
+  before_script: []
+  script:
+    - trivy image --severity HIGH,CRITICAL
+        --exit-code 1 --ignore-unfixed
+        "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA"

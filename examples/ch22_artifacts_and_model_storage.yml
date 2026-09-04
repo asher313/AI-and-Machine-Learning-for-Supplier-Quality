@@ -1,0 +1,21 @@
+# Chapter 22 — 22.5 Artifacts and Model Storage
+register_model:
+  stage: register
+  script:
+    # Option 1 — object storage (Northlake's choice)
+    - DEST="s3://${MODEL_BUCKET}/${MODEL_NAME}"
+    - aws s3 cp artifacts/model.joblib
+        "${DEST}/${CI_COMMIT_SHA}/model.joblib"
+        --sse aws:kms
+
+    # Option 2 — GitLab's generic package registry
+    - PROJ="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}"
+    - export PKG="${PROJ}/packages/generic"
+    - curl -fsS --header "JOB-TOKEN: $CI_JOB_TOKEN"
+        --upload-file artifacts/model.joblib
+        "${PKG}/${MODEL_NAME}/${CI_COMMIT_SHA}/model.joblib"
+
+    # Option 3 — an experiment tracker, if the team runs one
+    - uv run mlflow models register
+        --model-uri artifacts/model
+        --name ${MODEL_NAME}

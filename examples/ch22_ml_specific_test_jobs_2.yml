@@ -1,0 +1,10 @@
+# Chapter 22 — 22.8 ML-Specific Test Jobs
+# The weekly evaluation — a schedule set in the UI
+weekly_golden_set:
+  stage: evaluate
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  script:
+    - uv run python -m sqm_ai.build4.eval_golden
+        --out reports/golden.json
+  artifacts: {when: always, paths: [reports/golden.json]}

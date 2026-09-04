@@ -1,0 +1,87 @@
+# Chapter 2.2 — The Project Skeleton, extended with every
+# dependency a later chapter installs with `uv add`.
+[project]
+name = "sqm-ai"
+version = "0.1.0"
+description = "Northlake supplier-quality AI systems"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # Chapter 2
+    "numpy>=2.0",
+    "pandas>=2.2",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "structlog>=24.1",
+    # Chapter 3
+    "scipy",
+    # Chapter 4
+    "sqlalchemy",
+    "psycopg[binary]",
+    # Chapter 5
+    "hdbcli",
+    "sqlalchemy-hana",
+    "pyyaml",
+    # Chapter 6
+    "pyarrow",
+    # Chapter 15 (and 23: the Bedrock extra)
+    "anthropic[bedrock]",
+    # Chapter 17
+    "sentence-transformers",
+    "pgvector",
+    "rank-bm25",
+    # Chapter 20
+    "rapidfuzz",
+    # Chapter 23
+    "boto3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "ruff>=0.5",
+]
+
+# Part III's algorithm catalogue, Part IV's deep-learning
+# chapters, and Chapter 9's tuning and explainability
+# sections import these. The book installs them as it goes;
+# they are grouped here so `uv sync` stays fast for a reader
+# who is only working through Parts I and II.
+[project.optional-dependencies]
+ml = [
+    "scikit-learn>=1.6",
+    "xgboost>=2.0",
+    "lightgbm>=4.0",
+    "joblib",
+    "optuna",
+    "shap",
+    "imbalanced-learn",
+]
+dl = [
+    "torch>=2.0",
+    "transformers",
+    "datasets",
+    "peft",
+    "bitsandbytes",
+    "onnx",
+    "onnxruntime",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sqm_ai"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q -m 'not llm'"
+markers = [
+    "llm: calls a paid language model; run on purpose",
+    "integration: needs a live database",
+    "nightly: runs in the scheduled pipeline only",
+]
+
+[tool.ruff]
+line-length = 66
+target-version = "py312"

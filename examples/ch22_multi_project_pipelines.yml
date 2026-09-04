@@ -1,0 +1,10 @@
+# Chapter 22 — 22.7 Multi-Project Pipelines
+deploy_to_platform:
+  stage: deploy
+  trigger:
+    project: supplier-quality/sqm-platform
+    branch: main
+    strategy: depend      # fail if the downstream fails
+  variables:
+    UPSTREAM_MODEL_SHA: $CI_COMMIT_SHA
+    UPSTREAM_IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA

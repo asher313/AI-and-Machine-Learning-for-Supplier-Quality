@@ -1,0 +1,18 @@
+# Chapter 22 — 22.4 Runners and GPUs
+train_defect_model:
+  stage: train
+  tags:
+    - gpu
+  timeout: 4 hours
+  variables:
+    CUDA_VISIBLE_DEVICES: "0"
+  script:
+    - uv run python -m sqm_ai.build2.train
+
+# Registration is run once, on the runner host:
+#   gitlab-runner register \
+#     --url https://gitlab.northlake.internal \
+#     --token "$RUNNER_TOKEN" \
+#     --executor docker \
+#     --docker-image python:3.12-slim \
+#     --tag-list "gpu,standard"

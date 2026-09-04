@@ -1,0 +1,37 @@
+# k8s/ncr-classifier.yaml  (Deployment + Service)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ncr-classifier
+spec:
+  replicas: 3
+  selector:
+    matchLabels: {app: ncr-classifier}
+  template:
+    metadata:
+      labels: {app: ncr-classifier}
+    spec:
+      containers:
+        - name: api
+          image: sqm-ai/ncr-classifier:v1.2
+          ports:
+            - containerPort: 8000
+          resources:
+            requests: {cpu: 500m, memory: 1Gi}
+            limits: {cpu: "1", memory: 2Gi}
+          env:
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: anthropic
+                  key: api-key
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ncr-classifier
+spec:
+  selector: {app: ncr-classifier}
+  ports:
+    - port: 80
+      targetPort: 8000

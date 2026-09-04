@@ -1,0 +1,24 @@
+# docker/docker-compose.yml
+#
+# The book never prints a compose file. This one is assembled
+# from two things it does print: Chapter 17.5's
+# `CREATE EXTENSION IF NOT EXISTS vector` against the analytics
+# database, and Chapter 22.8's CI service container
+# (`postgres:16`, alias `postgres`, database `sqm_test`).
+# It gives you the Postgres + pgvector the retrieval chapters
+# assume, on a laptop.
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: sqm
+      POSTGRES_PASSWORD: sqm
+      POSTGRES_DB: sqm_analytics
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../sql:/docker-entrypoint-initdb.d/sql:ro
+
+volumes:
+  pgdata:

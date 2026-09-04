@@ -1,0 +1,12 @@
+# Chapter 2 — Asher at Northlake
+# .gitlab-ci.yml  (minimal; Chapter 22 builds the real one)
+image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+stages: [test]
+
+test:
+  stage: test
+  script:
+    - uv sync --frozen
+    - uv run ruff check src tests
+    - uv run pytest

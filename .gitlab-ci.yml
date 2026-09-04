@@ -1,0 +1,138 @@
+# .gitlab-ci.yml  (Build 1 — supplier risk score)
+stages:
+  - lint
+  - test
+  - data
+  - train
+  - evaluate
+  - register
+  - deploy
+
+variables:
+  PY_IMAGE: python:3.12-slim
+  MODEL_NAME: supplier-risk
+  DATA_BUCKET: northlake-sqm-data
+  MODEL_BUCKET: northlake-sqm-models
+  UV_CACHE_DIR: .cache/uv
+  ART: artifacts/${MODEL_NAME}-${CI_COMMIT_SHA}
+
+default:
+  image: $PY_IMAGE
+  tags: [standard]
+  cache:
+    key: uv-3.12
+    paths:
+      - .cache/uv
+  before_script:
+    - pip install --quiet uv
+    - uv sync --frozen
+
+# 1 — code quality
+lint:
+  stage: lint
+  script:
+    - uv run ruff check src tests
+    - uv run ruff format --check src tests
+    - uv run mypy src
+
+# 2 — unit tests, no database, no model, no network
+unit_tests:
+  stage: test
+  script:
+    - uv run pytest tests/unit --cov=src
+        --cov-report=xml
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+
+# 3 — is the training data still shaped like the data
+#     the model was designed for?
+validate_data:
+  stage: data
+  script:
+    - uv run python -m sqm_ai.data.validate
+        --table sqm.supplier_month
+        --report reports/data_quality.html
+  artifacts:
+    when: always
+    paths:
+      - reports/data_quality.html
+    expire_in: 30 days
+
+# 4 — training, on the GPU runner
+train_model:
+  stage: train
+  tags: [gpu]
+  timeout: 2 hours
+  script:
+    - uv run python -m sqm_ai.build1.train
+        --config configs/train.yaml
+        --out ${ART}
+  artifacts:
+    paths:
+      - artifacts/
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH =~ /^experiment\//
+
+# 5 — metrics, then the gate
+evaluate:
+  stage: evaluate
+  needs: [train_model]
+  script:
+    # train wrote ${ART}/metrics.json (Chapter 10)
+    - cp ${ART}/metrics.json reports/evaluation.json
+    - uv run python -m sqm_ai.ci.gate
+        --metrics reports/evaluation.json
+        --min-auc 0.85
+        --min-recall-sev3 0.90
+  artifacts:
+    when: always
+    paths:
+      - reports/evaluation.json
+      - reports/confusion_matrix.png
+    reports:
+      junit: reports/evaluation.xml
+
+# 6 — the binary leaves GitLab and gets a version
+register_model:
+  stage: register
+  needs: [evaluate]
+  script:
+    - aws s3 cp ${ART}/
+        s3://${MODEL_BUCKET}/${MODEL_NAME}/${CI_COMMIT_SHA}/
+        --recursive --sse aws:kms
+    - uv run python -m sqm_ai.ci.register
+        --name ${MODEL_NAME}
+        --sha ${CI_COMMIT_SHA}
+        --metrics reports/evaluation.json
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# 7 — staging automatically, production on a click
+deploy_staging:
+  stage: deploy
+  needs: [register_model]
+  script:
+    - ./scripts/deploy.sh staging ${CI_COMMIT_SHA}
+  environment:
+    name: staging
+    url: https://sqm-staging.northlake.internal
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+deploy_production:
+  stage: deploy
+  needs: [deploy_staging]
+  script:
+    - ./scripts/deploy.sh production ${CI_COMMIT_SHA}
+  environment:
+    name: production
+    url: https://sqm.northlake.internal
+  when: manual
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
