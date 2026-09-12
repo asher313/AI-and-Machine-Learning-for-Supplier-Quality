@@ -1,36 +1,116 @@
-# sqm_ai/gateway/audit.py
+"""Append-only lifecycle events and optional authenticated encrypted payloads."""
+
 import hashlib
 import json
+import os
+from pathlib import Path
+import uuid
 
 import psycopg
-
-INSERT = """
-INSERT INTO llm_audit (
-  trace_id, ts, user_id, tool_name, model, enclave,
-  prompt_hash, prompt_tokens, response_hash, response_tokens,
-  pre_warnings, post_warnings, blocked, block_codes,
-  latency_ms, cost_usd
-) VALUES (
-  %(trace_id)s, now(), %(user_id)s, %(tool_name)s, %(model)s,
-  %(enclave)s, %(prompt_hash)s, %(prompt_tokens)s,
-  %(response_hash)s, %(response_tokens)s, %(pre)s, %(post)s,
-  %(blocked)s, %(block_codes)s, %(latency_ms)s, %(cost_usd)s
-)
-"""
+from psycopg.types.json import Jsonb
 
 
-def sha256(text: str | None) -> str | None:
-    if text is None:
-        return None
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+def canonical(value):
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    )
+
+
+def sha256(text):
+    return (
+        hashlib.sha256(text.encode()).hexdigest()
+        if text is not None
+        else None
+    )
 
 
 class AuditWriter:
-    def __init__(self, dsn: str):
-        self.conn = psycopg.connect(dsn, autocommit=True)
+    def __init__(self, dsn):
+        self.dsn = dsn
 
-    def write(self, row: dict) -> None:
-        row = dict(row)
-        row["pre"] = json.dumps(row.pop("pre_warnings", []))
-        row["post"] = json.dumps(row.pop("post_warnings", []))
-        self.conn.execute(INSERT, row)
+    def write(self, row):
+        # A separate connection/transaction cannot be rolled back by the caller's business transaction.
+        with psycopg.connect(self.dsn, autocommit=True) as conn:
+            conn.execute(
+                "INSERT INTO sqm.llm_audit_events(trace_id,event,record) VALUES (%s,%s,%s)",
+                (row["trace_id"], row["event"], Jsonb(row)),
+            )
+
+
+class EncryptedContentStore:
+    """Local teaching store. Production requires approved key/storage/access management."""
+
+    def __init__(self, directory, key, *, key_id, allowed_levels):
+        from cryptography.hazmat.primitives.ciphers.aead import (
+            AESGCM,
+        )
+
+        if len(key) != 32 or not key_id:
+            raise ValueError(
+                "32-byte key and nonempty key ID required"
+            )
+        self.path = Path(directory)
+        self.path.mkdir(parents=True, exist_ok=True)
+        self.aead, self.key_id = AESGCM(key), key_id
+        self.allowed_levels = frozenset(allowed_levels)
+
+    def put(self, trace_id, kind, text, *, classification):
+        if classification not in self.allowed_levels:
+            raise ValueError(
+                "archive destination not approved for this classification"
+            )
+        blob_id = uuid.uuid4().hex
+        aad = canonical(
+            {
+                "trace_id": trace_id,
+                "kind": kind,
+                "key_id": self.key_id,
+                "classification": classification,
+            }
+        ).encode()
+        nonce = os.urandom(12)
+        ciphertext = self.aead.encrypt(nonce, text.encode(), aad)
+        value = {
+            "aad": aad.decode(),
+            "nonce": nonce.hex(),
+            "ciphertext": ciphertext.hex(),
+        }
+        path = self.path / (blob_id + ".json")
+        fd = os.open(
+            path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600
+        )
+        with os.fdopen(fd, "w") as stream:
+            stream.write(canonical(value))
+            stream.flush()
+            os.fsync(stream.fileno())
+        return blob_id
+
+    def get(self, blob_id, *, trace_id, kind, classification):
+        if len(blob_id) != 32 or any(
+            c not in "0123456789abcdef" for c in blob_id
+        ):
+            raise ValueError("invalid blob ID")
+        if classification not in self.allowed_levels:
+            raise ValueError("archive classification not allowed")
+        value = json.loads(
+            (self.path / (blob_id + ".json")).read_text()
+        )
+        aad = canonical(
+            {
+                "trace_id": trace_id,
+                "kind": kind,
+                "key_id": self.key_id,
+                "classification": classification,
+            }
+        ).encode()
+        if value["aad"].encode() != aad:
+            raise ValueError("archive context mismatch")
+        return self.aead.decrypt(
+            bytes.fromhex(value["nonce"]),
+            bytes.fromhex(value["ciphertext"]),
+            aad,
+        ).decode()

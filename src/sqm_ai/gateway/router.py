@@ -1,64 +1,145 @@
-# sqm_ai/gateway/router.py
-import os
+"""Explicit approved endpoints and transactionally reserved estimated spend."""
+
+from dataclasses import dataclass
+from decimal import Decimal, ROUND_CEILING
 
 import psycopg
-from anthropic import AnthropicBedrockMantle
 
-from sqm_ai.llm import MODELS, client as commercial
-from sqm_ai.gateway.policy import BudgetExceeded
-
-# USD per million tokens (input, output); first-party list
-# prices as of September 2026 — mirror of the Ch 15 table.
-PRICE_PER_MTOK = {
-    "claude-opus-5": (5.00, 25.00),
-    "claude-sonnet-5": (2.00, 10.00),
-    "claude-haiku-4-5": (1.00, 5.00),
-}
-
-MTD_SQL = """
-SELECT COALESCE(SUM(cost_usd), 0) FROM llm_audit
-WHERE ts >= date_trunc('month', now())
-"""
+from sqm_ai.gateway.policy import BudgetExceeded, PolicyViolation
 
 
-def cost_usd(model: str, in_tok: int, out_tok: int) -> float:
-    base = model.removeprefix("anthropic.")
-    p_in, p_out = PRICE_PER_MTOK[base]
-    return (in_tok * p_in + out_tok * p_out) / 1_000_000
-
-
-class BudgetLedger:
-    def __init__(self, dsn: str, cap: float, soft: float):
-        self.conn = psycopg.connect(dsn, autocommit=True)
-        self.cap, self.soft = cap, soft
-
-    def month_to_date(self) -> float:
-        return float(self.conn.execute(MTD_SQL).fetchone()[0])
-
-    def state(self) -> str:
-        spent = self.month_to_date()
-        if spent >= self.cap:
-            return "hard"
-        if spent >= self.soft * self.cap:
-            return "soft"
-        return "ok"
+@dataclass(frozen=True)
+class Endpoint:
+    name: str
+    model: str
+    allowed_levels: frozenset[str]
+    invoke: object
+    quote: object  # Return a conservative Decimal token-charge estimate before dispatch.
+    charge: object  # Compute actual supported token charges from returned usage.
 
 
 class ModelRouter:
-    """controlled -> Bedrock in the enclave; else commercial."""
+    def __init__(self, endpoints):
+        # Operator-provided (classification,tier)->Endpoint registry, not a user-provided URL.
+        self.endpoints = dict(endpoints)
 
-    def __init__(self) -> None:
-        self.enclave = AnthropicBedrockMantle(
-            aws_region=os.environ["NL_ENCLAVE_REGION"]
+    def choose(self, enclave, tier):
+        endpoint = self.endpoints.get((enclave, tier))
+        if (
+            endpoint is None
+            or enclave not in endpoint.allowed_levels
+        ):
+            raise PolicyViolation(["GW-ROUTE"])
+        return endpoint
+
+
+def money(value):
+    result = Decimal(str(value))
+    if not result.is_finite() or result < 0:
+        raise ValueError("finite nonnegative amount required")
+    return result.quantize(
+        Decimal("0.00000001"), rounding=ROUND_CEILING
+    )
+
+
+class BudgetLedger:
+    """UTC calendar-month estimates including concurrent in-flight reservations."""
+
+    def __init__(self, dsn, cap, soft):
+        self.dsn, self.cap, self.soft = (
+            dsn,
+            money(cap),
+            Decimal(str(soft)),
         )
+        if (
+            self.cap <= 0
+            or not self.soft.is_finite()
+            or not 0 < self.soft <= 1
+        ):
+            raise ValueError(
+                "positive cap and soft fraction in (0,1] required"
+            )
 
-    def choose(self, enclave: str, tier: str, budget: str,
-               essential: bool):
-        if budget == "hard":
-            if not essential:
-                raise BudgetExceeded("monthly cap reached")
-            tier = "fast"                  # degrade, don't stop
-        base = MODELS[tier]
-        if enclave == "controlled":
-            return self.enclave, "anthropic." + base
-        return commercial, base
+    def reserve(self, trace_id, quote):
+        quote = money(quote)
+        with psycopg.connect(self.dsn) as conn:
+            period = conn.execute(
+                "SELECT date_trunc('month',now() AT TIME ZONE 'UTC')::date"
+            ).fetchone()[0]
+            conn.execute(
+                "INSERT INTO sqm.gateway_budget_months(period,cap) VALUES (%s,%s) ON CONFLICT DO NOTHING",
+                (period, self.cap),
+            )
+            spent, reserved, cap = conn.execute(
+                "SELECT spent,reserved,cap FROM sqm.gateway_budget_months WHERE period=%s FOR UPDATE",
+                (period,),
+            ).fetchone()
+            if cap != self.cap:
+                raise ValueError(
+                    "shared monthly cap differs; explicit operator migration required"
+                )
+            if spent + reserved + quote > cap:
+                raise BudgetExceeded(
+                    "estimated monthly reservation cap exceeded"
+                )
+            conn.execute(
+                "INSERT INTO sqm.gateway_reservations VALUES (%s,%s,%s,NULL,'reserved')",
+                (trace_id, period, quote),
+            )
+            conn.execute(
+                "UPDATE sqm.gateway_budget_months SET reserved=reserved+%s WHERE period=%s",
+                (quote, period),
+            )
+            return (
+                "soft"
+                if spent + reserved + quote
+                >= self.soft * self.cap
+                else "ok"
+            )
+
+    def settle(self, trace_id, actual=None, *, reconcile=False):
+        """Reconcile uncertain charges only from operator-verified billing evidence."""
+        with psycopg.connect(self.dsn) as conn:
+            period = conn.execute(
+                "SELECT period FROM sqm.gateway_reservations WHERE trace_id=%s",
+                (trace_id,),
+            ).fetchone()[0]
+            conn.execute(
+                "SELECT period FROM sqm.gateway_budget_months WHERE period=%s FOR UPDATE",
+                (period,),
+            )
+            period, quoted, status, recorded = conn.execute(
+                "SELECT period,quoted,status,actual FROM sqm.gateway_reservations WHERE trace_id=%s FOR UPDATE",
+                (trace_id,),
+            ).fetchone()
+            if status == "settled":
+                if (
+                    actual is not None
+                    and money(actual) == recorded
+                ):
+                    return (
+                        recorded <= quoted
+                    )  # Safe repeat after an ambiguous acknowledgement.
+                raise ValueError(
+                    "settled charge differs; explicit accounting correction required"
+                )
+            if actual is None:
+                conn.execute(
+                    "UPDATE sqm.gateway_reservations SET status='uncertain' WHERE trace_id=%s",
+                    (trace_id,),
+                )
+                return False
+            if status == "uncertain" and not reconcile:
+                raise ValueError(
+                    "uncertain charge requires explicit reconciliation"
+                )
+            actual = money(actual)
+            conn.execute(
+                "UPDATE sqm.gateway_budget_months SET reserved=reserved-%s,spent=spent+%s WHERE period=%s",
+                (quoted, actual, period),
+            )
+            conn.execute(
+                "UPDATE sqm.gateway_reservations SET status='settled',actual=%s WHERE trace_id=%s",
+                (actual, trace_id),
+            )
+            return actual <= quoted

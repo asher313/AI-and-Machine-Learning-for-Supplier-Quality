@@ -1,29 +1,24 @@
--- sqm_ai/gateway/schema.sql   (Postgres)
-CREATE TABLE llm_audit (
-    trace_id        UUID        NOT NULL,
-    ts              TIMESTAMPTZ NOT NULL,
-    user_id         VARCHAR(128) NOT NULL,
-    tool_name       VARCHAR(64)  NOT NULL,
-    model           VARCHAR(64),
-    -- enclave: open | internal | controlled
-    enclave         VARCHAR(16)  NOT NULL,
-    prompt_hash     CHAR(64)     NOT NULL, -- sha256, not text
-    prompt_tokens   INT,
-    response_hash   CHAR(64),
-    response_tokens INT,
-    pre_warnings    JSONB,
-    post_warnings   JSONB,
-    blocked         BOOLEAN      NOT NULL DEFAULT FALSE,
-    block_codes     TEXT[],
-    latency_ms      INT,
-    cost_usd        NUMERIC(10, 6),
-    user_feedback   VARCHAR(16),           -- good | bad | NULL
-    PRIMARY KEY (trace_id, ts)
+-- Separate append-only lifecycle events; default partition prevents rollover gaps.
+CREATE TABLE IF NOT EXISTS sqm.llm_audit_events (
+  trace_id uuid NOT NULL,
+  ts timestamptz NOT NULL DEFAULT now(),
+  event text NOT NULL,
+  record jsonb NOT NULL,
+  PRIMARY KEY (trace_id, ts, event)
 ) PARTITION BY RANGE (ts);
-
--- one partition per month; a job creates next month's ahead
-CREATE TABLE llm_audit_2026_09 PARTITION OF llm_audit
-    FOR VALUES FROM ('2026-09-01') TO ('2026-10-01');
-
-CREATE INDEX ON llm_audit (user_id, ts DESC);
-CREATE INDEX ON llm_audit (blocked, ts DESC) WHERE blocked;
+CREATE TABLE IF NOT EXISTS sqm.llm_audit_events_default
+  PARTITION OF sqm.llm_audit_events DEFAULT;
+CREATE INDEX IF NOT EXISTS llm_audit_trace ON sqm.llm_audit_events(trace_id,ts);
+CREATE TABLE IF NOT EXISTS sqm.gateway_budget_months (
+  period date PRIMARY KEY,
+  cap numeric(18,8) NOT NULL CHECK(cap>0),
+  spent numeric(18,8) NOT NULL DEFAULT 0 CHECK (spent>=0),
+  reserved numeric(18,8) NOT NULL DEFAULT 0 CHECK (reserved>=0)
+);
+CREATE TABLE IF NOT EXISTS sqm.gateway_reservations (
+  trace_id uuid PRIMARY KEY,
+  period date NOT NULL REFERENCES sqm.gateway_budget_months(period),
+  quoted numeric(18,8) NOT NULL CHECK (quoted>=0),
+  actual numeric(18,8),
+  status text NOT NULL CHECK(status IN ('reserved','settled','uncertain'))
+);

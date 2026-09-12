@@ -6,9 +6,7 @@ from sqm_ai.gateway.policy import ENCLAVE_RANK
 PII_PATTERNS = {
     "ssn": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
     "email": re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b"),
-    "phone": re.compile(
-        r"\b\(?\d{3}\)?[-. ]?\d{3}[-. ]?\d{4}\b"
-    ),
+    "phone": re.compile(r"\b\(?\d{3}\)?[-. ]?\d{3}[-. ]?\d{4}\b"),
     "card": re.compile(r"\b(?:\d[ -]?){13,16}\b"),
 }
 
@@ -16,8 +14,7 @@ PII_PATTERNS = {
 class PIIDetector:
     def scan(self, text: str) -> list[str]:
         return [
-            k for k, p in PII_PATTERNS.items()
-            if p.search(text)
+            k for k, p in PII_PATTERNS.items() if p.search(text)
         ]
 
     def redact(self, text: str) -> str:
@@ -49,7 +46,8 @@ class MarkingDetector:
 def required_enclave(levels: list[str]) -> str:
     """Highest level any marking demands; 'open' if none."""
     return max(
-        levels, key=ENCLAVE_RANK.__getitem__,
+        levels,
+        key=ENCLAVE_RANK.__getitem__,
         default="open",
     )
 

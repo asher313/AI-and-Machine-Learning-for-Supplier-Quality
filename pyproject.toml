@@ -31,6 +31,8 @@ dependencies = [
     "rank-bm25",
     # Chapter 20
     "rapidfuzz",
+    # Chapter 21 authenticated encrypted teaching archive
+    "cryptography>=46",
     # Chapter 23
     "boto3",
 ]

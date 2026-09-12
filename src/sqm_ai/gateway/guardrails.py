@@ -1,85 +1,90 @@
-# sqm_ai/gateway/guardrails.py
+"""Heuristic signals supplement trusted classification; no claim of complete DLP."""
+
 import re
 
 from sqm_ai.gateway.detectors import (
-    MarkingDetector, PIIDetector, injection_score,
+    MarkingDetector,
+    PIIDetector,
+    injection_score,
     required_enclave,
 )
-from sqm_ai.gateway.policy import (
-    ENCLAVE_RANK, GatewayUser, Policy, PolicyViolation,
-)
+from sqm_ai.gateway.policy import ENCLAVE_RANK, PolicyViolation
 
 CITATION = re.compile(r"\[(\d+)\]")
 
 
 class Guardrails:
-    def __init__(self, policy: Policy):
+    def __init__(self, policy):
         self.policy = policy
-        self.pii = PIIDetector()
-        self.marks = MarkingDetector()
+        self.pii, self.marks = PIIDetector(), MarkingDetector()
 
     def pre_check(
-        self, prompt: str, user: GatewayUser, enclave: str
-    ) -> list[str]:
-        """Return warnings; raise PolicyViolation to block."""
-        codes, reasons, warnings = [], [], []
-
-        # 1. personal data — allowed only with a permission
-        hits = self.pii.scan(prompt)
+        self, payload, user, enclave, *, classification="unknown"
+    ):
+        # All labels/permissions must come from the authenticated application, not prompt text.
+        if (
+            classification not in ENCLAVE_RANK
+            or enclave not in ENCLAVE_RANK
+        ):
+            raise PolicyViolation(["GW-CLASS"])
+        if classification not in user.allowed_levels:
+            raise PolicyViolation(["GW-AUTH"])
+        codes, warnings = [], []
+        hits = self.pii.scan(payload)
         if hits and "pii_in_prompts" not in user.permissions:
             codes.append("GW-PII")
-            reasons.append(f"personal data detected: {hits}")
         elif hits:
-            warnings.append(f"pii allowed by permission: {hits}")
-
-        # 2. markings — content must not outrank its enclave
-        need = required_enclave(self.marks.scan(prompt))
-        if ENCLAVE_RANK[enclave] < ENCLAVE_RANK[need]:
+            warnings.append("authorized personal-data processing")
+        need = required_enclave(
+            [classification, *self.marks.scan(payload)]
+        )
+        if (
+            ENCLAVE_RANK[enclave] < ENCLAVE_RANK[need]
+            or ENCLAVE_RANK[classification] < ENCLAVE_RANK[need]
+        ):
             codes.append("GW-MARK")
-            reasons.append(
-                f"content requires {need}; running in {enclave}"
-            )
-
-        # 3. forbidden patterns (program and NDA names)
-        for pat in self.policy.forbidden_patterns:
-            if re.search(pat, prompt, re.IGNORECASE):
-                codes.append("GW-PATTERN")
-                reasons.append("matches a forbidden pattern")
-                break
-
-        # 4. injection heuristic
-        score = injection_score(prompt)
+        if any(
+            re.search(p, payload, re.IGNORECASE)
+            for p in self.policy.forbidden_patterns
+        ):
+            codes.append("GW-PATTERN")
+        score = injection_score(payload)
         if score >= self.policy.injection_threshold:
             codes.append("GW-INJECT")
-            reasons.append(f"suspected injection ({score:.2f})")
-        elif score > 0:
-            warnings.append(f"injection score {score:.2f}")
-
+        elif score:
+            warnings.append(
+                "injection phrase signal; not a calibrated probability"
+            )
         if codes:
-            raise PolicyViolation(codes, reasons)
+            raise PolicyViolation(codes)
         return warnings
 
-    def post_check(
-        self, response: str, sources: list[str] | None
-    ) -> tuple[str, list[str]]:
-        """Return (possibly redacted response, warnings)."""
+    def post_check(self, response, sources, *, enclave):
         warnings = []
-
+        if (
+            self.marks.scan(response)
+            and ENCLAVE_RANK[
+                required_enclave(self.marks.scan(response))
+            ]
+            > ENCLAVE_RANK[enclave]
+        ):
+            raise PolicyViolation(["GW-POST-MARK"])
+        if any(
+            re.search(p, response, re.IGNORECASE)
+            for p in self.policy.forbidden_patterns
+        ):
+            raise PolicyViolation(["GW-POST-PATTERN"])
         if self.pii.scan(response):
             response = self.pii.redact(response)
-            warnings.append("pii redacted from response")
-
-        if self.marks.scan(response):
-            warnings.append("response carries a marking")
-
-        if self.policy.validate_citations and sources is not None:
-            cited = {int(n) for n in CITATION.findall(response)}
-            n_src = len(sources)
-            bad = sorted(
-                n for n in cited
-                if n > n_src or n < 1
+            warnings.append(
+                "personal-data pattern redacted; residual identifiers may remain"
             )
-            if bad:
-                warnings.append(f"unsupported citations: {bad}")
-
+        if self.policy.validate_citations:
+            nums = [int(n) for n in CITATION.findall(response)]
+            if (
+                not sources
+                or not nums
+                or any(n < 1 or n > len(sources) for n in nums)
+            ):
+                raise PolicyViolation(["GW-CITE"])
         return response, warnings
