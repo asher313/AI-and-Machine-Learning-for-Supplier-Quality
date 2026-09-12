@@ -1,4 +1,4 @@
-# Chapter 15 — 15.2 Streaming and Multi-Turn
+# Chapter 15 teaching listing. Supply the inputs described in the text.
 from sqm_ai.llm import MODELS, client
 
 with client.messages.stream(

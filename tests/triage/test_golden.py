@@ -1,21 +1,43 @@
-# tests/triage/test_golden.py  (marked: nightly)
+"""Explicit opt-in evaluation; no corpus is loaded at collection time."""
+
 import json
+import os
+from pathlib import Path
+
 import pytest
+
 from sqm_ai.triage.pipeline import triage_one
 
-pytestmark = pytest.mark.nightly
-GOLDEN = json.load(open("tests/data/golden_ncrs.json"))
+pytestmark = [pytest.mark.llm, pytest.mark.nightly]
 
 
-def test_category_agreement_above_threshold():
-    hits = sum(triage_one(g["ncr"]).category == g["category"]
-               for g in GOLDEN)
-    assert hits / len(GOLDEN) >= 0.92
+@pytest.fixture(scope="module")
+def evaluated():
+    path = os.environ.get("SQM_GOLDEN_NCRS")
+    if not path:
+        pytest.skip(
+            "set SQM_GOLDEN_NCRS to an approved, independently labelled evaluation corpus"
+        )
+    golden = json.loads(Path(path).read_text())
+    if not golden:
+        pytest.fail("empty evaluation corpus")
+    return [(g, triage_one(g["ncr"])) for g in golden]
 
 
-def test_no_missed_severity_five():
-    """Under-calling a safety-critical NCR is the one
-    error that is never acceptable at any rate."""
-    assert [] == [
-        g for g in GOLDEN if g["severity"] == 5
-        and triage_one(g["ncr"]).severity < 5]
+def test_category_agreement_above_threshold(evaluated):
+    hits = sum(
+        d.result is not None
+        and d.result.category == g["category"]
+        for g, d in evaluated
+    )
+    assert hits / len(evaluated) >= 0.92
+
+
+def test_no_missed_severity_five(evaluated):
+    safety = [(g, d) for g, d in evaluated if g["severity"] == 5]
+    assert safety, "evaluation needs severity-five cases"
+    assert not [
+        g
+        for g, d in safety
+        if d.result is None or d.result.severity < 5
+    ]

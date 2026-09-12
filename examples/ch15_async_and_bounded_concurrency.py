@@ -1,37 +1,37 @@
-# Chapter 15 — 15.5 Async and Bounded Concurrency
+# Chapter 15 teaching listing. Supply the inputs described in the text.
 import asyncio
+from sqm_ai.llm import MODELS, aclient, awith_retry, parsed_response, request_options
+from sqm_ai.structured import SYSTEM, NCRClassification
 
-from sqm_ai.llm import MODELS, aclient
-
-# SYSTEM and NCRClassification: imports as in §15.3.
-
-
-async def classify_one(description: str) -> NCRClassification:
-    response = await aclient.messages.parse(
+async def classify_one(description):
+    response = await awith_retry(
+        aclient.messages.parse,
         model=MODELS["standard"],
-        max_tokens=512,
+        max_tokens=1024,
         system=SYSTEM,
         messages=[{"role": "user", "content": description}],
         output_format=NCRClassification,
-        output_config={"effort": "low"},
+        **request_options(MODELS["standard"]),
     )
-    return response.parsed_output
+    return parsed_response(response)
 
 
-async def classify_many(
-    descriptions: list[str], limit: int = 8
-) -> list[NCRClassification | BaseException]:
-    """Run all calls; at most `limit` in flight at once."""
-    gate = asyncio.Semaphore(limit)
-
-    async def bounded(desc: str):
-        async with gate:
-            return await classify_one(desc)
-
-    return await asyncio.gather(
-        *(bounded(d) for d in descriptions),
-        return_exceptions=True,
-    )
+async def classify_many(descriptions, limit=8):
+    """Bound in-flight calls and scheduled task count; this is not a TPM limiter."""
+    if not isinstance(limit, int) or limit < 1:
+        raise ValueError("positive concurrency limit required")
+    results = []
+    for start in range(0, len(descriptions), limit):
+        results.extend(
+            await asyncio.gather(
+                *(
+                    classify_one(d)
+                    for d in descriptions[start : start + limit]
+                ),
+                return_exceptions=True,
+            )
+        )
+    return results
 
 
 results = asyncio.run(classify_many(batch))

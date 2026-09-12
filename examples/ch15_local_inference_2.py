@@ -1,4 +1,4 @@
-# Chapter 15 — 15.10 Local Inference
+# Chapter 15 teaching listing. Supply the inputs described in the text.
 import httpx
 
 # SYSTEM and NCRClassification: imports as in §15.3.

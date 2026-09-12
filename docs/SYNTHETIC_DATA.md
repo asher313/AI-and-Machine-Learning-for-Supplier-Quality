@@ -152,3 +152,10 @@ SAP extraction needs an authorized HANA system. The language-model,
 retrieval, and deployment Builds also require their own documents,
 service configurations, and credentials. Synthetic numeric datasets
 alone do not turn those external integrations into offline programs.
+
+## Build 3 software replay
+
+`python scripts/generate_triage_data.py` produces separate fictional record and
+scripted-response fixtures. Run `python -m sqm_ai.triage.run_build3` to exercise
+the pipeline without an API or database. This is not a model-quality golden set
+and does not promise the narrative performance figures. See [BUILD3_RUN.md](BUILD3_RUN.md).

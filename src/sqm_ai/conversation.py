@@ -1,4 +1,3 @@
-# Chapter 15 teaching listing. Supply the inputs described in the text.
 """Text conversation with transactional local history (no tool execution)."""
 
 from sqm_ai.llm import (

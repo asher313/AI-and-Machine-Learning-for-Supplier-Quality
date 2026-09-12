@@ -1,7 +1,7 @@
-# Chapter 16 — 16.7 Tracing Every Call
-result, trace = traced(
-    lambda: call_model(MODELS["fast"], ncr, nbrs),
-    ncr.defect_description,
-    ncr_id=ncr.ncr_id,
-    stage="fast",
-)
+from sqm_ai.llm import MODELS
+from sqm_ai.triage.classify import call_model
+
+# Supply an NCRInput and confirmed prior examples as described in Chapter 16.
+traces = []
+result, response = call_model(MODELS["fast"], ncr, nbrs, traces=traces)
+trace_ids = [trace.trace_id for trace in traces]

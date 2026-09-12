@@ -1,4 +1,3 @@
-# Chapter 15 teaching listing. Supply the inputs described in the text.
 """Bounded answer cache; semantic reuse requires an application verifier."""
 
 import time

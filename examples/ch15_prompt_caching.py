@@ -1,4 +1,4 @@
-# Chapter 15 — 15.6 Prompt Caching
+# Chapter 15 teaching listing. Supply the inputs described in the text.
 from sqm_ai.llm import MODELS, client
 
 TAXONOMY = open("prompts/taxonomy.md").read()   # ~3,000 tokens

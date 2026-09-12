@@ -1,59 +1,81 @@
-# src/sqm_ai/triage/trace.py
-from __future__ import annotations
-import hashlib, time, uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+"""Per-call metadata; hashes support comparison, not content recovery or secrecy."""
+
+import hashlib
+import json
+import time
+import uuid
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 
 import structlog
+
 from sqm_ai.llm import estimate_cost
 
 log = structlog.get_logger()
 
 
-def _h(text: str) -> str:
-    """First 16 hex chars of the SHA-256 of the text."""
-    return hashlib.sha256(text.encode()).hexdigest()[:16]
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+def _h(text):
+    return hashlib.sha256(text.encode()).hexdigest()
 
 
 @dataclass
 class LLMTrace:
-    """One row per model call. Never holds prompt text."""
     trace_id: str = field(
-        default_factory=lambda: str(uuid.uuid4()))
-    timestamp: str = field(default_factory=_now)
+        default_factory=lambda: str(uuid.uuid4())
+    )
+    timestamp: str = field(
+        default_factory=lambda: datetime.now(UTC).isoformat()
+    )
     model: str = ""
-    stage: str = ""           # "fast" | "standard"
-    input_tokens: int = 0
-    output_tokens: int = 0
-    cache_read: int = 0
+    stage: str = ""
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cache_read: int | None = None
+    cache_written: int | None = None
     latency_ms: int = 0
-    cost_usd: float = 0.0
-    input_hash: str = ""
+    cost_usd: float | None = None
+    request_hash: str = ""
     output_hash: str = ""
-    metadata: dict = field(default_factory=dict)
+    request_id: str | None = None
+    status: str = "started"
+    error_type: str | None = None
 
 
-def traced(fn, description: str, **metadata):
-    """Run fn(); emit one LLMTrace whatever happens."""
-    trace = LLMTrace(input_hash=_h(description),
-                     stage=metadata.get("stage", ""),
-                     metadata=metadata)
+def traced(fn, request, *, stage, trace=None):
+    """One trace per attempted HTTP request; retries call this again."""
+    trace = trace if trace is not None else LLMTrace()
+    trace.model, trace.stage = request["model"], stage
+    trace.request_hash = _h(
+        json.dumps(request, sort_keys=True, separators=(",", ":"))
+    )
     start = time.perf_counter()
     try:
-        result, response = fn()
+        response = fn()
         u = response.usage
         trace.model = response.model
-        trace.input_tokens = u.input_tokens
-        trace.output_tokens = u.output_tokens
+        trace.request_id = getattr(response, "_request_id", None)
+        trace.input_tokens, trace.output_tokens = (
+            u.input_tokens,
+            u.output_tokens,
+        )
         trace.cache_read = u.cache_read_input_tokens or 0
+        trace.cache_written = u.cache_creation_input_tokens or 0
         trace.cost_usd = estimate_cost(response.model, u)
-        trace.output_hash = _h(result.model_dump_json())
-        return result, trace
+        blocks = [
+            b.model_dump(exclude_none=True)
+            for b in response.content
+        ]
+        trace.output_hash = _h(json.dumps(blocks, sort_keys=True))
+        trace.status = response.stop_reason
+        return response, trace
+    except Exception as exc:
+        trace.status, trace.error_type = (
+            "error",
+            type(exc).__name__,
+        )
+        raise
     finally:
         trace.latency_ms = int(
-            (time.perf_counter() - start) * 1000)
-        log.info("llm_call", **trace.__dict__)
+            (time.perf_counter() - start) * 1000
+        )
+        log.info("llm_attempt", **asdict(trace))

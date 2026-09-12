@@ -1,4 +1,4 @@
-# Chapter 15 — 15.1 The Canonical Call
+# Chapter 15 teaching listing. Supply the inputs described in the text.
 from sqm_ai.llm import MODELS, client
 
 response = client.messages.create(

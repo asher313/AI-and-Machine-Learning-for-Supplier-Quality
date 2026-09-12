@@ -1,7 +1,7 @@
 # tests/test_triage.py
 import pytest
 
-from sqm_ai import triage
+from sqm_ai import triage_intro as triage
 
 
 def fake_model(text: str) -> dict:
