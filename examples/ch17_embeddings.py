@@ -1,16 +1,15 @@
-# Chapter 17 — 17.4 Embeddings
-# np and SentenceTransformer: imports as in §17.2.
-def recall_at_k(
-    model_name: str, questions: list[tuple[str, int]],
-    corpus: list[str], k: int = 10,
-) -> float:
-    """Share of questions whose right chunk is in top-k."""
-    emb = SentenceTransformer(model_name)
-    vecs = emb.encode(corpus, normalize_embeddings=True)
-    hits = 0
-    for question, correct_id in questions:
-        q = emb.encode([question],
-                       normalize_embeddings=True)[0]
-        top = np.argsort(vecs @ q)[::-1][:k]
-        hits += int(correct_id in top)
-    return hits / len(questions)
+# Chapter 17 teaching listing. Supply the inputs described in the text.
+import numpy as np
+
+def recall_at_k(question_vectors, corpus_vectors, relevant_ids, k=10):
+    """Macro recall over nonempty relevance sets of corpus row indices."""
+    if k < 1 or len(question_vectors) != len(relevant_ids) or not relevant_ids:
+        raise ValueError("positive k and aligned nonempty evaluation required")
+    values = []
+    for query, relevant in zip(question_vectors, relevant_ids, strict=True):
+        relevant = set(relevant)
+        if not relevant or not relevant <= set(range(len(corpus_vectors))):
+            raise ValueError("each question needs valid adjudicated relevant row ids")
+        top = np.argsort(corpus_vectors @ query)[::-1][:k]
+        values.append(len(relevant.intersection(top)) / len(relevant))
+    return float(np.mean(values))

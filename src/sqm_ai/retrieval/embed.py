@@ -1,30 +1,71 @@
-# src/sqm_ai/retrieval/embed.py
-#
-# Chapter 17.4 describes this module in prose rather than in a
-# listing: "The chosen model is wrapped once, in
-# src/sqm_ai/retrieval/embed.py, which loads it at import and
-# exposes embed_query(text) and embed_corpus(texts). Every
-# later listing goes through those two functions, so the
-# 'same model for query and corpus' rule is enforced by there
-# being one place the model is named."
-#
-# TODO(book): described but not listed in Chapter 17.4 —
-# review before production use.
+"""Pinned BGE space; loading is explicit/lazy and never occurs on import."""
+
+from functools import lru_cache
+
 import numpy as np
-from sentence_transformers import SentenceTransformer
 
-MODEL_NAME = "all-MiniLM-L6-v2"   # 384 dimensions
-_model = SentenceTransformer(MODEL_NAME)
+MODEL_NAME = "BAAI/bge-large-en-v1.5"
+MODEL_REVISION = "d4aa6901d3a41ba39fb536a557fa166f842b0e09"
+DIMENSIONS = 1024
+QUERY_PREFIX = (
+    "Represent this sentence for searching relevant passages: "
+)
+EMBED_SPACE = (
+    f"{MODEL_NAME}@{MODEL_REVISION}:query-prefix-v1:normalized"
+)
 
 
-def embed_query(text: str) -> np.ndarray:
-    """One query string -> one normalized 384-vector."""
-    return _model.encode(text, normalize_embeddings=True)
+@lru_cache
+def get_model():
+    from sentence_transformers import SentenceTransformer
 
-
-def embed_corpus(texts: list[str]) -> np.ndarray:
-    """Many chunks -> an (n, 384) matrix, same model."""
-    return _model.encode(
-        texts, normalize_embeddings=True,
-        batch_size=64, show_progress_bar=False,
+    return SentenceTransformer(
+        MODEL_NAME, revision=MODEL_REVISION
     )
+
+
+def _encode(texts, *, query=False, model=None):
+    model = model if model is not None else get_model()
+    texts = (
+        [QUERY_PREFIX + t for t in texts]
+        if query
+        else list(texts)
+    )
+    lengths = [
+        len(model.tokenizer(t, truncation=False)["input_ids"])
+        for t in texts
+    ]
+    if any(n > model.max_seq_length for n in lengths):
+        raise ValueError(
+            "embedding input too long; split the passage or shorten the query"
+        )
+    vectors = np.asarray(
+        model.encode(
+            texts,
+            normalize_embeddings=True,
+            batch_size=64,
+            show_progress_bar=False,
+        ),
+        dtype=np.float32,
+    )
+    if (
+        vectors.shape != (len(texts), DIMENSIONS)
+        or not np.isfinite(vectors).all()
+    ):
+        raise ValueError(
+            "embedding dimension or values do not match configured space"
+        )
+    norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+    if np.any(norms == 0):
+        raise ValueError("zero embedding")
+    return vectors / norms
+
+
+def embed_query(text, *, model=None):
+    return _encode([text], query=True, model=model)[0]
+
+
+def embed_corpus(texts, *, model=None):
+    if not texts:
+        return np.empty((0, DIMENSIONS), dtype=np.float32)
+    return _encode(texts, model=model)

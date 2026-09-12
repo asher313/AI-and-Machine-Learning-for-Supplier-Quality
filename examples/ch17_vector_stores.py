@@ -1,4 +1,4 @@
-# Chapter 17 — 17.5 Vector Stores
+# Chapter 17 teaching listing. Supply the inputs described in the text.
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance, FieldCondition, Filter, MatchValue,
@@ -16,11 +16,11 @@ qc.upsert("sqm_docs", points=[
                 payload={"source_type": t, "text": c})
     for i, (v, t, c) in enumerate(zip(vecs, types, texts))
 ])
-hits = qc.search(
+hits = qc.query_points(
     collection_name="sqm_docs",
-    query_vector=qvec.tolist(),
+    query=qvec.tolist(),
     query_filter=Filter(must=[FieldCondition(
         key="source_type",
         match=MatchValue(value="as9100"))]),
     limit=50,
-)
+).points

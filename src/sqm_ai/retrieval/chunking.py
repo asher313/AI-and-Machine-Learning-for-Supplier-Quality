@@ -1,4 +1,3 @@
-# Chapter 17 teaching listing. Supply the inputs described in the text.
 """Text chunking baselines; verify extracted headings/tables before indexing."""
 
 import re
@@ -79,3 +78,31 @@ def clause_chunks(text, doc_id, chunk_size=800):
                 piece["content"] = prefix + piece["content"]
             out.append(piece)
     return out
+
+
+def semantic_chunk(text, embedder, threshold=0.5, chunk_size=800):
+    if not -1 <= threshold <= 1:
+        raise ValueError("cosine threshold outside [-1,1]")
+    sentences = [
+        s
+        for s in re.split(r"(?<=[.!?])\s+(?=[A-Z])", text)
+        if s.strip()
+    ]
+    if not sentences:
+        return []
+    vectors = embedder.encode(
+        sentences, normalize_embeddings=True
+    )
+    groups = []
+    current = [sentences[0]]
+    for i in range(1, len(sentences)):
+        if float(vectors[i - 1] @ vectors[i]) < threshold:
+            groups.append(" ".join(current))
+            current = []
+        current.append(sentences[i])
+    groups.append(" ".join(current))
+    return [
+        p["content"]
+        for group in groups
+        for p in recursive_chunks(group, "", chunk_size)
+    ]

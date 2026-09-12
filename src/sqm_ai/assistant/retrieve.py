@@ -1,39 +1,38 @@
-# src/sqm_ai/assistant/retrieve.py
+"""Scoped retrieval and a second authorization check before content leaves SQL."""
+
 import datetime as dt
 
-import psycopg
-
-from sqm_ai.retrieval.embed import embed_query
+from sqm_ai.retrieval.embed import EMBED_SPACE, embed_query
 from sqm_ai.retrieval.fuse import hybrid
 from sqm_ai.retrieval.rerank import rerank
-from sqm_ai.retrieval.store import connect
-
-LOAD = """
-SELECT id, document_id, source_type, clause, content
-  FROM sqm.doc_chunks
- WHERE id = ANY(%s)
-"""
+from sqm_ai.retrieval.store import connect, eligible_chunks
 
 
-def load_chunks(conn, ids: list[int]) -> list[dict]:
-    """Rows for the fused ids, kept in the fused order."""
-    with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
-        cur.execute(LOAD, (ids,))
-        by_id = {r["id"]: r for r in cur.fetchall()}
-    return [by_id[i] for i in ids if i in by_id]
+def load_chunks(
+    conn, ids, *, user, asof=None, embed_model=EMBED_SPACE
+):
+    return eligible_chunks(
+        conn,
+        user.allowed_source_types,
+        user.allowed_programs,
+        asof,
+        embed_model=embed_model,
+        ids=ids,
+    )
 
 
-def fetch_chunks(
-    question: str, user, asof: dt.date | None = None,
-    pool: int = 50, keep: int = 8,
-) -> list[dict]:
-    """The only way Build 4 retrieves anything."""
-    asof = asof or dt.date.today()
-    ef = 200 if len(user.programs) < 3 else 100
+def fetch_chunks(question, user, asof=None, pool=50, keep=8):
+    asof = asof or dt.datetime.now(dt.UTC).date()
+    ef = 200 if len(user.allowed_programs) < 3 else 100
     with connect() as conn:
         ids = hybrid(
-            question, embed_query(question), conn,
-            n=pool, user=user, asof=asof, ef_search=ef,
+            question,
+            embed_query(question),
+            conn,
+            n=pool,
+            user=user,
+            asof=asof,
+            ef_search=ef,
         )
-        rows = load_chunks(conn, ids)
+        rows = load_chunks(conn, ids, user=user, asof=asof)
     return rerank(question, rows, k=keep)

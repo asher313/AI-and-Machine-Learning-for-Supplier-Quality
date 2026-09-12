@@ -1,4 +1,3 @@
-# Chapter 17 teaching listing. Supply the inputs described in the text.
 """Parent expansion authorizes the parent independently before reading its text."""
 
 import datetime as dt

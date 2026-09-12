@@ -1,7 +1,7 @@
 # Technical-review checkpoint
 
 The `technical-review-2026-09` branch is an ongoing textbook/companion review.
-The complete manuscript and KDP layout are not yet finalized. Chapters 1–16
+The complete manuscript and KDP layout are not yet finalized. Chapters 1–17
 have received technical reading and correction passes; later chapters and
 cross-book metadata still require review. This is not a claim that every
 external-service Build or the entire repository test suite passes.
@@ -16,7 +16,9 @@ Verified local work includes:
 - Tiny offline category and severity Trainer workflows and response validation.
 - Full default synthetic Build 2 walkthrough, ONNX parity, and edge checks.
   Its predictive performance is poor; see BUILD2_RUN.md.
-- Nine PostgreSQL integration checks on isolated disposable test databases.
+- Eleven PostgreSQL integration checks on isolated disposable test databases.
+- Scoped dense, sparse, final-content, and parent retrieval, with a generated
+  offline indexing walkthrough. Neural retrieval quality remains unevaluated.
 - Chapter 15 response/retry/cache boundaries and Chapter 16 triage composition,
   with generated offline replay fixtures and explicit opt-in live evaluation.
 

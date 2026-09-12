@@ -70,6 +70,9 @@ dl = [
     "torchvision",
 ]
 
+retrieval = ["langchain-text-splitters", "qdrant-client"]
+local_llm = ["ollama", "httpx"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

@@ -1,4 +1,4 @@
-# Chapter 17 — 17.3 Chunking
+# Chapter 17 teaching listing. Supply the inputs described in the text.
 from langchain_text_splitters import (
     RecursiveCharacterTextSplitter,
 )
