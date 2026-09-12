@@ -26,3 +26,7 @@ CREATE INDEX doc_chunks_hnsw ON sqm.doc_chunks
     USING hnsw (embedding vector_cosine_ops) WITH (m=16, ef_construction=64);
 CREATE INDEX doc_chunks_program ON sqm.doc_chunks ((metadata->>'program'));
 CREATE INDEX doc_chunks_scope ON sqm.doc_chunks (source_type, embed_model, valid_from, valid_to);
+
+CREATE UNIQUE INDEX doc_chunks_one_open_position
+    ON sqm.doc_chunks(document_id, embed_model, chunk_index)
+    WHERE valid_to IS NULL;

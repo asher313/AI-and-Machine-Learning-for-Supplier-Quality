@@ -72,6 +72,11 @@ dl = [
 
 retrieval = ["langchain-text-splitters", "qdrant-client"]
 local_llm = ["ollama", "httpx"]
+evaluation = [
+    "ragas==0.4.3",
+    # Ragas 0.4.3 still imports the legacy VertexAI wrapper.
+    "langchain-community==0.3.31",
+]
 
 [build-system]
 requires = ["hatchling"]

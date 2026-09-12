@@ -7,7 +7,7 @@ SOURCES = ("as9100", "manual", "car", "audit")
 @dataclass(frozen=True)
 class AssistantUser:
     user_id: str
-    programs: tuple[str, ...] = ()   # ("NL-KESTREL",)
+    programs: tuple[str, ...] = ()  # ("NL-KESTREL",)
     sources: tuple[str, ...] = SOURCES
 
     @property

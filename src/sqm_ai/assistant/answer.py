@@ -1,70 +1,164 @@
-# Chapter 18 — 18.4 Three Layers Against Hallucination
-# src/sqm_ai/assistant/answer.py
+"""Draft structured claims, validate complete coverage, then render a result."""
+
+import json
 from dataclasses import dataclass
 
-from sqm_ai.assistant.prompts import REFUSAL, SYSTEM
-from sqm_ai.llm import MODELS, client, log_usage, with_retry
+import anthropic
+from pydantic import ValidationError
+
+from sqm_ai.assistant.prompts import (
+    REFUSAL,
+    SYSTEM,
+    VERIFICATION_FAILURE,
+)
+from sqm_ai.assistant.schema import Draft
+from sqm_ai.assistant.validate import (
+    CitationReport,
+    check_citations,
+    report_problems,
+    require_approved,
+    structural_check,
+)
+from sqm_ai.llm import (
+    MODELS,
+    client,
+    count_tokens,
+    log_usage,
+    parsed_response,
+    request_options,
+    with_retry,
+)
 
 
 @dataclass
 class Answer:
     text: str
-    chunks: list[dict]    # the chunk rows, in [N] order
+    chunks: list[dict]
     refused: bool
     warnings: list[str]
+    status: str = "verified"
 
 
-def build_context(chunks: list[dict]) -> str:
-    """Number the chunks; [N] in the answer is chunks[N-1]."""
-    parts = []
-    for i, c in enumerate(chunks, start=1):
-        ref = c["clause"] or c["document_id"]
-        parts.append(
-            f"[{i}] source={c['source_type']} ref={ref}\n"
-            f"{c['content']}"
-        )
-    return "\n\n".join(parts)
+def source_view(chunks):
+    keys = (
+        "id",
+        "source_type",
+        "document_id",
+        "document_revision",
+        "clause",
+        "content",
+        "valid_from",
+        "valid_to",
+    )
+    return [{k: c.get(k) for k in keys} for c in chunks]
 
 
-def draft_answer(question: str, chunks: list[dict]) -> str:
-    context = build_context(chunks)
-    response = with_retry(
-        client.messages.create,
-        model=MODELS["frontier"],
-        max_tokens=900,
-        system=[
-            {"type": "text", "text": SYSTEM,
-             "cache_control": {"type": "ephemeral"}},
+def build_context(chunks):
+    return json.dumps(
+        [
+            {"number": i, **c}
+            for i, c in enumerate(source_view(chunks), 1)
         ],
-        messages=[{
+        default=str,
+    )
+
+
+def draft_answer(
+    question, chunks, *, data_classification="unknown"
+):
+    require_approved(data_classification)
+    messages = [
+        {
             "role": "user",
-            "content": (
-                f"Documents:\n{context}\n\n"
-                f"Question: {question}"
-            ),
-        }],
+            "content": f"Sources: {build_context(chunks)}\nQuestion: {question}",
+        }
+    ]
+    if (
+        count_tokens(
+            model=MODELS["frontier"],
+            system=SYSTEM,
+            messages=messages,
+        )
+        + 1600
+        + 1024
+        > 200000
+    ):
+        raise ValueError(
+            "draft context budget exceeded; pack fewer or shorter sources"
+        )
+    response = with_retry(
+        client.messages.parse,
+        model=MODELS["frontier"],
+        max_tokens=1600,
+        system=SYSTEM,
+        messages=messages,
+        output_format=Draft,
+        **request_options(MODELS["frontier"]),
     )
     log_usage(response, tool="assistant", stage="draft")
-    return "".join(
-        b.text for b in response.content if b.type == "text"
-    )
+    return parsed_response(response)
 
 
-# Chapter 18 — 18.4 Three Layers Against Hallucination (continued)
-def answer_question(question, chunks: list[dict]) -> Answer:
-    """Draft, validate, and decide what the user sees."""
+def answer_question(
+    question,
+    chunks,
+    *,
+    data_classification="unknown",
+    drafter=None,
+    checker=None,
+):
+    """Input chunks must already be authorized; injected adapters enforce their boundary."""
     if not chunks:
-        return Answer(REFUSAL, [], True, ["no chunks"])
-
-    text = draft_answer(question, chunks)
-    if text.strip() == REFUSAL:
-        return Answer(REFUSAL, chunks, True, [])
-
-    context = build_context(chunks)
-    warnings = structural_check(text, len(chunks))
-    report = check_citations(text, context)
-    bad = [c for c in report.checks if not c.supported]
-    warnings += [
-        f"[{c.citation}] unsupported: {c.reason}" for c in bad
-    ]
-    return Answer(text, chunks, False, warnings)
+        return Answer(
+            REFUSAL,
+            [],
+            True,
+            ["no authorized sources"],
+            "refused",
+        )
+    chunks = source_view(chunks)
+    try:
+        draft = (drafter or draft_answer)(
+            question,
+            chunks,
+            data_classification=data_classification,
+        )
+        draft = Draft.model_validate(draft)
+        if draft.refused:
+            return Answer(REFUSAL, chunks, True, [], "refused")
+        problems = structural_check(draft, len(chunks))
+        if not problems:
+            report = (checker or check_citations)(
+                question,
+                draft,
+                chunks,
+                data_classification=data_classification,
+            )
+            problems = report_problems(
+                CitationReport.model_validate(report), draft
+            )
+        if problems:
+            return Answer(
+                VERIFICATION_FAILURE,
+                chunks,
+                True,
+                problems,
+                "verification_failed",
+            )
+        text = "\n".join(
+            c.text + " " + " ".join(f"[{n}]" for n in c.citations)
+            for c in draft.claims
+        )
+        return Answer(text, chunks, False, [], "verified")
+    except (
+        anthropic.APIError,
+        ValidationError,
+        ValueError,
+    ) as exc:
+        return Answer(
+            VERIFICATION_FAILURE,
+            chunks,
+            True,
+            [type(exc).__name__],
+            "verification_failed",
+        )
