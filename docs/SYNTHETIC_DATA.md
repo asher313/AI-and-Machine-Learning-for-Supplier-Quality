@@ -43,7 +43,7 @@ the full-size row-count contracts and cannot use the book's fixed
 | File | Contents and use |
 |---|---|
 | `data/ncrs_2025-09_2026-08.csv` | The Chapter 1 export: 29,412 rows, 11 columns, September 2025 through August 2026. |
-| `data/ncrs.parquet` | Longer synthetic NCR event history, including descriptions, owners, and recorded timestamps. |
+| `data/ncrs.parquet` | Synthetic NCR history from June 2023, including descriptions, owners, and recorded timestamps; the extra three months support the first trailing window. |
 | `data/suppliers.parquet` | 1,800 suppliers, including explicit onboarding dates. |
 | `data/supplier_month_all.parquet` | 62,518 eligible supplier-months spanning 36 months. Includes the final three months with null forward labels. |
 | `data/supplier_month.parquet` | 57,118 mature labeled rows used by the Part III examples; includes engineered features. |
@@ -76,6 +76,8 @@ The NCR fixture matches all of these counts:
 - 1,106 suppliers with at least five NCRs.
 - Cobalt's August row: 47 NCRs, nine severity-3+ reports, 139 NCRs in
   June–August, FPY 0.912, OTD 0.83, audit score 71, and four open CARs.
+- The three rounded August vectors in Chapter 3, and root incident
+  `NCR-2026-0042` on August 18, 2026, for Cobalt, severity 3.
 
 The supplier panel matches 57,118 mature labeled rows and 5,483
 positive rows (0.09599426, displayed as 0.096). The apparent arithmetic

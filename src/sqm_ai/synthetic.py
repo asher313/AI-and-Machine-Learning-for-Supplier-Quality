@@ -51,7 +51,17 @@ def make_ncrs(s: pd.DataFrame) -> pd.DataFrame:
     counts = [612, 498, 455] + [105] * 21 + [104] * 190
     counts += [6] * 728 + [5] * 164 + [1] * 694
     records = []
+    warmup_rng = np.random.default_rng(SEED + 99)
     for i, row in s.iterrows():
+        # Three months of source history make the first 90-day
+        # feature window complete for already-established suppliers.
+        if row.onboarded_at < MONTHS[0]:
+            for _ in range(counts[i] // 4):
+                stamp = pd.Timestamp("2023-06-01") + pd.Timedelta(
+                    days=int(warmup_rng.integers(0, 92)),
+                    hours=int(warmup_rng.integers(0, 24)),
+                )
+                records.append((row.supplier_id, stamp))
         for year in range(3):
             months = MONTHS[year * 12 : (year + 1) * 12]
             months = months[months >= row.onboarded_at]
@@ -102,12 +112,43 @@ def make_ncrs(s: pd.DataFrame) -> pd.DataFrame:
         rng.shuffle(vals)
         if sid == "S-0417":
             aug = n.loc[idx, "discovered_at"].ge("2026-08-01")
-            vals[aug] = [5] * 6 + [4] * 3 + [2] * 38
+            vals[aug] = [5] * 7 + [4, 3] + [2] * 38
             prior = np.flatnonzero(~aug)
             remainder = total - int(vals[aug].sum())
             vals[prior] = remainder // len(prior)
             vals[prior[: remainder % len(prior)]] += 1
+        if sid == "S-0088":
+            aug = (
+                n.loc[idx, "discovered_at"]
+                .ge("2026-08-01")
+                .to_numpy()
+            )
+            difference = 22 - int(vals[aug].sum())
+            vals[aug] = [2] * 10 + [1] * 2
+            candidates = np.flatnonzero(
+                ~aug & (vals == (2 if difference > 0 else 1))
+            )
+            vals[candidates[: abs(difference)]] -= np.sign(
+                difference
+            )
         n.loc[idx, "severity"] = vals
+    root = n.index[
+        n.supplier_id.eq("S-0417")
+        & n.discovered_at.ge("2026-08-01")
+        & n.severity.eq(3)
+    ][0]
+    previous = n.index[n.ncr_id.eq("NCR-2026-0042")][0]
+    n.loc[[root, previous], "ncr_id"] = n.loc[
+        [previous, root], "ncr_id"
+    ].to_numpy()
+    n.at[root, "discovered_at"] = pd.Timestamp(
+        "2026-08-18 10:00:00"
+    )
+    if n.at[root, "category"] != "dimensional":
+        other = n.index[recent & n.category.eq("dimensional")][0]
+        n.loc[[root, other], "category"] = n.loc[
+            [other, root], "category"
+        ].to_numpy()
     # Add persistent episodes until the complete-window label
     # count is 5,483 / 57,118 (rounds to the printed 0.096).
     label_keys = [
@@ -182,15 +223,22 @@ def make_ncrs(s: pd.DataFrame) -> pd.DataFrame:
     n["closed_at"] = n.closed_at.clip(
         upper=COMPLETE_THROUGH - pd.Timedelta(seconds=1)
     )
-    n.loc[
-        rng.choice(n.index[recent], 2317, replace=False),
-        "closed_at",
-    ] = pd.NaT
+    opened = rng.choice(n.index[recent], 2317, replace=False)
+    if root not in opened:
+        opened[0] = root
+    n.loc[opened, "closed_at"] = pd.NaT
     n["owner"] = "Synthetic Quality Engineer"
     n["description"] = [
         f"Synthetic training example: {c} nonconformance on {p}."
         for c, p in zip(n.category, n.part_number)
     ]
+    n.at[root, "part_number"] = "7741-B"
+    n.at[root, "quantity"] = 12
+    n.at[root, "owner"] = "Ravi Menon"
+    n.at[root, "description"] = (
+        "Twelve 7741-B brackets have mounting holes displaced 2 mm "
+        "from the drawing; contain the lot pending engineering review."
+    )
     # Demo availability is immediate; real systems need recorded_at.
     n["recorded_at"] = n.discovered_at
     return n
@@ -205,7 +253,12 @@ def make_supplier_month(
     rows = []
     for supplier in s.itertuples():
         events = event_groups.get(supplier.supplier_id)
-        observed_months = MONTHS[MONTHS >= supplier.onboarded_at]
+        receipt_history = pd.date_range(
+            "2023-06-01", periods=39, freq="MS"
+        )
+        observed_months = receipt_history[
+            receipt_history >= supplier.onboarded_at
+        ]
         # Each month has 100 fictional complete PO-line receipts,
         # all on day 15. This makes the delivery denominators explicit.
         received_units = 100 * rng.integers(
@@ -457,6 +510,7 @@ def generate(output: Path) -> dict:
         "seed": SEED,
         "synthetic": True,
         "data_complete_through": "2026-09-01",
+        "event_history_start": "2023-06-01",
         "supplier_month_rows": len(sm),
         "labeled_rows": len(labeled),
         "positives": int(labeled.sev3_next_90d.sum()),

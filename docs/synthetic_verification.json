@@ -5,6 +5,28 @@
     "panel_rows": 62518,
     "mature_rows": 57118,
     "positives": 5483,
+    "event_history_start": "2023-06-01",
+    "rounded_august_vectors": {
+      "S-0417": [
+        47,
+        2.5,
+        0.912,
+        0.83
+      ],
+      "S-1130": [
+        39,
+        2.9,
+        0.933,
+        0.88
+      ],
+      "S-0088": [
+        12,
+        1.8,
+        0.981,
+        0.96
+      ]
+    },
+    "root_incident": "NCR-2026-0042",
     "cobalt_difference_ci": [
       -0.0446,
       -0.0161

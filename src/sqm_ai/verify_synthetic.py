@@ -21,7 +21,9 @@ def require(condition, message):
 
 
 def check_hashes(folder: Path, manifest_name: str):
-    manifest = json.loads((folder / manifest_name).read_text())
+    manifest = json.loads(
+        (folder / manifest_name).read_text()
+    )
     require(
         manifest["synthetic"] is True,
         "missing synthetic provenance",
@@ -29,7 +31,9 @@ def check_hashes(folder: Path, manifest_name: str):
     for name, expected in manifest["files"].items():
         digest = hashlib.sha256()
         with (folder / name).open("rb") as f:
-            for block in iter(lambda: f.read(1024 * 1024), b""):
+            for block in iter(
+                lambda: f.read(1024 * 1024), b""
+            ):
                 digest.update(block)
         require(
             digest.hexdigest() == expected,
@@ -41,8 +45,12 @@ def check_hashes(folder: Path, manifest_name: str):
 def verify_supplier(folder: Path):
     manifest = check_hashes(folder, "synthetic_manifest.json")
     n = pd.read_parquet(folder / "ncrs.parquet")
-    sm = pd.read_parquet(folder / "supplier_month_all.parquet")
-    labeled = pd.read_parquet(folder / "supplier_month.parquet")
+    sm = pd.read_parquet(
+        folder / "supplier_month_all.parquet"
+    )
+    labeled = pd.read_parquet(
+        folder / "supplier_month.parquet"
+    )
     export = pd.read_csv(folder / "ncrs_2025-09_2026-08.csv")
     require(export.shape == (29412, 11), "NCR shape")
     require(export.ncr_id.is_unique, "duplicate NCR IDs")
@@ -51,7 +59,8 @@ def verify_supplier(folder: Path):
         "missing costs",
     )
     require(
-        int(export.closed_at.isna().sum()) == 2317, "open NCRs"
+        int(export.closed_at.isna().sum()) == 2317,
+        "open NCRs",
     )
     counts = export.supplier_id.value_counts()
     require(
@@ -61,12 +70,14 @@ def verify_supplier(folder: Path):
     )
     require(len(counts) == 1800, "active supplier coverage")
     require(
-        int(counts.cumsum().searchsorted(0.8 * len(export))) + 1
+        int(counts.cumsum().searchsorted(0.8 * len(export)))
+        + 1
         == 214,
         "Pareto crossing",
     )
     require(
-        int((counts >= 5).sum()) == 1106, "NCR count threshold"
+        int((counts >= 5).sum()) == 1106,
+        "NCR count threshold",
     )
     require(
         export.category.value_counts().to_dict()
@@ -82,7 +93,9 @@ def verify_supplier(folder: Path):
         len(labeled) == 57118 and sm.month.nunique() == 36,
         "supplier month coverage",
     )
-    require(labeled.sev3_next_90d.sum() == 5483, "positive count")
+    require(
+        labeled.sev3_next_90d.sum() == 5483, "positive count"
+    )
     require(
         int(sm.month.ge("2025-09-01").sum()) == 21600,
         "Chapter 4 twelve-month slice",
@@ -94,7 +107,9 @@ def verify_supplier(folder: Path):
     require(
         (
             sm.month
-            >= sm.onboarded_at.dt.to_period("M").dt.to_timestamp()
+            >= sm.onboarded_at.dt.to_period(
+                "M"
+            ).dt.to_timestamp()
         ).all(),
         "pre-onboarding rows",
     )
@@ -134,13 +149,16 @@ def verify_supplier(folder: Path):
         positive_sum = np.r_[
             0, (events.severity.to_numpy() >= 3).cumsum()
         ]
-        harm_sum = np.r_[0, events.severity.to_numpy().cumsum()]
+        harm_sum = np.r_[
+            0, events.severity.to_numpy().cumsum()
+        ]
         mature = rows.label_end.le(complete).to_numpy()
         require(
             np.array_equal(
-                (positive_sum[right] - positive_sum[left] > 0)[
-                    mature
-                ],
+                (
+                    positive_sum[right] - positive_sum[left]
+                    > 0
+                )[mature],
                 rows.sev3_next_90d[mature].astype(int),
             ),
             "future label mismatch",
@@ -153,7 +171,8 @@ def verify_supplier(folder: Path):
             "future harm mismatch",
         )
     cobalt = sm[
-        sm.supplier_id.eq("S-0417") & sm.month.eq("2026-08-01")
+        sm.supplier_id.eq("S-0417")
+        & sm.month.eq("2026-08-01")
     ].iloc[0]
     require(
         (
@@ -174,11 +193,49 @@ def verify_supplier(folder: Path):
         == (0.912, 0.83, 71, 4),
         "Cobalt monthly metrics",
     )
+    expected_vectors = {
+        "S-0417": (47, 2.5, 0.912, 0.83),
+        "S-1130": (39, 2.9, 0.933, 0.88),
+        "S-0088": (12, 1.8, 0.981, 0.96),
+    }
+    for sid, expected in expected_vectors.items():
+        row = sm[
+            sm.supplier_id.eq(sid) & sm.month.eq("2026-08-01")
+        ].iloc[0]
+        require(
+            (
+                int(row.ncr_count),
+                round(row.avg_severity, 1),
+                row.fpy,
+                row.otd,
+            )
+            == expected,
+            f"rounded August vector: {sid}",
+        )
+    incident = n[n.ncr_id.eq("NCR-2026-0042")]
+    require(len(incident) == 1, "root incident identity")
+    incident = incident.iloc[0]
+    require(
+        incident.supplier_id == "S-0417"
+        and incident.discovered_at
+        == pd.Timestamp("2026-08-18 10:00:00")
+        and incident.severity == 3,
+        "root incident details",
+    )
+    require(
+        pd.Timestamp(manifest["event_history_start"])
+        <= sm.month.min()
+        + pd.offsets.MonthBegin(1)
+        - pd.Timedelta(days=90),
+        "incomplete history for first trailing window",
+    )
     lots = pd.read_csv(folder / "cobalt_lot_fpy.csv")
     a = lots.loc[lots.period.eq("before"), "fpy"].to_numpy()
     b = lots.loc[lots.period.eq("after"), "fpy"].to_numpy()
     t, p = stats.ttest_ind(a, b, equal_var=False)
-    diff = tuple(np.round(bootstrap_diff_ci(a, b, np.mean), 4))
+    diff = tuple(
+        np.round(bootstrap_diff_ci(a, b, np.mean), 4)
+    )
     mean_ci = tuple(np.round(bootstrap_ci(b, np.mean), 4))
     require(
         (round(t, 2), round(p, 5)) == (4.03, 0.00015),
@@ -199,6 +256,11 @@ def verify_supplier(folder: Path):
         "panel_rows": len(sm),
         "mature_rows": len(labeled),
         "positives": int(labeled.sev3_next_90d.sum()),
+        "event_history_start": manifest[
+            "event_history_start"
+        ],
+        "rounded_august_vectors": expected_vectors,
+        "root_incident": "NCR-2026-0042",
         "cobalt_difference_ci": diff,
         "cobalt_mean_ci": mean_ci,
     }
@@ -234,11 +296,14 @@ def verify_cnc(folder: Path):
         validate="one_to_one",
     )
     require(
-        int(joined.failed.isna().sum()) == m["unmatched_cycles"],
+        int(joined.failed.isna().sum())
+        == m["unmatched_cycles"],
         "unmatched cycles",
     )
     if m["raw_windows"]:
-        windows = np.load(folder / "windows.npy", mmap_mode="r")
+        windows = np.load(
+            folder / "windows.npy", mmap_mode="r"
+        )
         labels = np.load(folder / "labels.npy")
         require(
             windows.shape == (m["raw_windows"], 5, 512),
@@ -248,9 +313,12 @@ def verify_cnc(folder: Path):
             int(labels.sum()) == m["raw_failures"],
             "pilot failures",
         )
-        pilot = pd.read_parquet(folder / "pilot_cycles.parquet")
+        pilot = pd.read_parquet(
+            folder / "pilot_cycles.parquet"
+        )
         require(
-            pilot.machine_id.eq("TUL-CNC-07").all(), "pilot cell"
+            pilot.machine_id.eq("TUL-CNC-07").all(),
+            "pilot cell",
         )
         require(
             np.array_equal(labels, pilot.failed),
@@ -269,7 +337,9 @@ def verify_cnc(folder: Path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data", type=Path, default=Path("data"))
+    parser.add_argument(
+        "--data", type=Path, default=Path("data")
+    )
     parser.add_argument("--cnc", type=Path)
     args = parser.parse_args()
     result = {"supplier": verify_supplier(args.data)}
