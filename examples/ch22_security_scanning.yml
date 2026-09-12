@@ -1,17 +1,21 @@
-# Chapter 22 — 22.6 Security Scanning
+# Optional templates: verify names/analyzers and licensing on your GitLab version.
 include:
   - template: Jobs/SAST.gitlab-ci.yml
   - template: Jobs/Secret-Detection.gitlab-ci.yml
-  - template: Jobs/Dependency-Scanning.gitlab-ci.yml
-  - template: Jobs/Container-Scanning.gitlab-ci.yml
+  - template: Jobs/Dependency-Scanning.latest.gitlab-ci.yml
+variables:
+  DS_ENFORCE_NEW_ANALYZER: 'true'
 
-# A hard gate of your own on the built image
+# Scan a previously built immutable image; this job does not build it.
+# Configure TRIVY_IMAGE as a reviewed image@sha256 digest and
+# SCANNED_IMAGE_DIGEST as the approved build's image@sha256 digest.
 trivy_scan:
   stage: test
-  image: aquasec/trivy:0.56.2
+  image:
+    name: $TRIVY_IMAGE
+    entrypoint: [""]
   tags: [standard]
   before_script: []
   script:
-    - trivy image --severity HIGH,CRITICAL
-        --exit-code 1 --ignore-unfixed
-        "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA"
+    - test -n "$SCANNED_IMAGE_DIGEST"
+    - trivy image --severity HIGH,CRITICAL --exit-code 1 "$SCANNED_IMAGE_DIGEST"

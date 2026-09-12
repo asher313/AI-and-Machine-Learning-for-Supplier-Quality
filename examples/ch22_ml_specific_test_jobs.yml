@@ -1,41 +1,29 @@
-# Chapter 22 — 22.8 ML-Specific Test Jobs
-# 1 — unit: pure functions, no data, no network
+# Supplementary jobs for the main pipeline's environment.
 test_units:
   stage: test
-  script:
-    - uv run pytest tests/unit -q
+  script: [uv run --no-sync pytest tests/test_ncr.py tests/test_ci.py]
 
-# 2 — integration: a real database, started as a service
 test_integration:
   stage: test
   services:
     - name: postgres:16
       alias: postgres
   variables:
-    POSTGRES_DB: sqm_test
+    POSTGRES_DB: postgres
     POSTGRES_USER: sqm
-    POSTGRES_PASSWORD: test
-    DATABASE_URL: >-
-      postgresql+psycopg://sqm:test@postgres:5432/sqm_test
+    POSTGRES_PASSWORD: test-only
+    SQM_TEST_DATABASE_URL: postgresql+psycopg://sqm:test-only@postgres:5432/postgres
   script:
-    - uv run python scripts/setup_test_db.py
-    - uv run pytest tests/integration -q -m integration
+    - uv run --no-sync pytest tests/test_supplier_month.py tests/gateway
 
-# 3 — contract: does the trained model still behave?
 test_model_contract:
   stage: evaluate
   needs: [train_model]
   script:
-    - uv run pytest tests/model -q
-        --model artifacts/${MODEL_NAME}-${CI_COMMIT_SHA}
-        --golden-set data/golden_set.jsonl
-        --min-accuracy 0.85
+    - uv run --no-sync pytest tests/build1/test_training_partitions.py tests/build1/test_score_contract.py
 
-# 4 — language model: recorded responses, never live calls
+# These tests explicitly inject scripted SDK responses, not an environment mode.
 test_llm_playback:
   stage: test
-  variables:
-    SQM_LLM_MODE: playback
-    ANTHROPIC_API_KEY: "not-used-in-playback"
   script:
-    - uv run pytest tests/llm -q -m llm
+    - uv run --no-sync pytest tests/test_llm_boundary.py tests/test_structured_boundary.py tests/triage/test_pipeline.py

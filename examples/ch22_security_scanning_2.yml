@@ -1,10 +1,5 @@
-# Chapter 22 — 22.6 Security Scanning
-# Chapter 21.2's rule, enforced: only the gateway may
-# import the raw model client.
-gateway_only:
+# Boundary behavior checks; this does not enforce universal SDK mediation.
+gateway_boundaries:
   stage: test
-  before_script: []
   script:
-    - >-
-      ! grep -rn --include=*.py --exclude-dir=gateway
-      -E "from sqm_ai\.llm import .*\bclient\b" src/sqm_ai
+    - uv run --no-sync pytest tests/gateway

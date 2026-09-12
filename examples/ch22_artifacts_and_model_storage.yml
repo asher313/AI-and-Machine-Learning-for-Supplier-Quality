@@ -1,21 +1,23 @@
-# Chapter 22 — 22.5 Artifacts and Model Storage
-register_model:
+# Optional production-storage extension: choose one destination.
+# The runner must have the needed CLI, least-privilege credentials,
+# and verified model artifacts from train_model and evaluate.
+register_s3:
   stage: register
+  needs: [train_model, evaluate]
   script:
-    # Option 1 — object storage (Northlake's choice)
-    - DEST="s3://${MODEL_BUCKET}/${MODEL_NAME}"
-    - aws s3 cp artifacts/model.joblib
-        "${DEST}/${CI_COMMIT_SHA}/model.joblib"
-        --sse aws:kms
+    - test -n "$MODEL_BUCKET" && test -n "$MODEL_KMS_KEY_ID"
+    - DEST="s3://${MODEL_BUCKET}/supplier-risk/${CI_COMMIT_SHA}/${CI_PIPELINE_ID}"
+    - aws s3 cp artifacts/model/ "$DEST/" --recursive --sse aws:kms --sse-kms-key-id "$MODEL_KMS_KEY_ID"
 
-    # Option 2 — GitLab's generic package registry
+# Alternative to register_s3; do not run both accidentally.
+register_package:
+  stage: register
+  needs: [train_model, evaluate]
+  script:
+    - tar -czf artifacts/model.tar.gz -C artifacts/model .
     - PROJ="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}"
-    - export PKG="${PROJ}/packages/generic"
-    - curl -fsS --header "JOB-TOKEN: $CI_JOB_TOKEN"
-        --upload-file artifacts/model.joblib
-        "${PKG}/${MODEL_NAME}/${CI_COMMIT_SHA}/model.joblib"
-
-    # Option 3 — an experiment tracker, if the team runs one
-    - uv run mlflow models register
-        --model-uri artifacts/model
-        --name ${MODEL_NAME}
+    - PKG="${PROJ}/packages/generic/supplier-risk"
+    - VERSION="${CI_COMMIT_SHA}-${CI_PIPELINE_ID}"
+    - >-
+      curl --fail-with-body --header "JOB-TOKEN: $CI_JOB_TOKEN"
+      --upload-file artifacts/model.tar.gz "${PKG}/${VERSION}/model.tar.gz"

@@ -15,3 +15,7 @@ data/*.parquet
 *.pt
 *.onnx
 .DS_Store
+
+# Local generated replays and CI reports
+work/
+reports/

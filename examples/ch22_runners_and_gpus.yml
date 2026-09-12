@@ -1,18 +1,17 @@
-# Chapter 22 — 22.4 Runners and GPUs
-train_defect_model:
+# Optional GPU smoke check after the operator configures device access.
+gpu_smoke:
   stage: train
-  tags:
-    - gpu
-  timeout: 4 hours
-  variables:
-    CUDA_VISIBLE_DEVICES: "0"
+  tags: [gpu]
+  timeout: 10 minutes
+  variables: {CUDA_VISIBLE_DEVICES: "0"}
   script:
-    - uv run python -m sqm_ai.build2.train
+    - uv run --no-sync python -c "import torch; assert torch.cuda.is_available(); print(torch.cuda.get_device_name(0))"
 
-# Registration is run once, on the runner host:
-#   gitlab-runner register \
-#     --url https://gitlab.northlake.internal \
-#     --token "$RUNNER_TOKEN" \
-#     --executor docker \
-#     --docker-image python:3.12-slim \
-#     --tag-list "gpu,standard"
+# Create the runner in GitLab's UI/API with the GPU tag and
+# Run untagged jobs disabled. Register on the runner host:
+# gitlab-runner register --non-interactive \
+#   --url https://gitlab.northlake.internal \
+#   --token "$RUNNER_AUTH_TOKEN" --executor docker \
+#   --docker-image python:3.12-slim
+# Configure the NVIDIA runtime/device access in the runner;
+# CUDA_VISIBLE_DEVICES selects an exposed device, it cannot expose one.

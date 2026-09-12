@@ -21,7 +21,7 @@ def load_module(path):
 
 @pytest.fixture
 def services(tmp_path):
-    pytest.importorskip("langgraph")
+    pytest.importorskip("langgraph.checkpoint.sqlite")
     from sqm_ai.car.run_build5 import replay_services
 
     generator = load_module(ROOT / "scripts/generate_car_data.py")

@@ -1,10 +1,14 @@
-# Chapter 22 — 22.7 Multi-Project Pipelines
+# Optional extension to a configured, authorized downstream project.
 deploy_to_platform:
   stage: deploy
   trigger:
     project: supplier-quality/sqm-platform
     branch: main
-    strategy: depend      # fail if the downstream fails
+    strategy: mirror
   variables:
     UPSTREAM_MODEL_SHA: $CI_COMMIT_SHA
-    UPSTREAM_IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    UPSTREAM_RUN_ID: $CI_PIPELINE_ID
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
+      allow_failure: false

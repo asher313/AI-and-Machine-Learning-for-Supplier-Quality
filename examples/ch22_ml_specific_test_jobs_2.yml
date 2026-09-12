@@ -1,10 +1,21 @@
-# Chapter 22 — 22.8 ML-Specific Test Jobs
-# The weekly evaluation — a schedule set in the UI
+# Optional scheduled evaluation of an approved, versioned answer corpus.
+# Supply the corpus at SQM_APPROVED_EVAL_ROWS via approved storage;
+# provide authorized credentials and preprovision the pinned BGE weights.
 weekly_golden_set:
   stage: evaluate
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $RUN_LIVE_EVAL == "true"'
+  variables:
+    RAGAS_DO_NOT_TRACK: 'true'
+    HF_HUB_OFFLINE: '1'
   script:
-    - uv run python -m sqm_ai.build4.eval_golden
-        --out reports/golden.json
-  artifacts: {when: always, paths: [reports/golden.json]}
+    - uv sync --locked --extra ml --extra evaluation
+    - test -f "$SQM_APPROVED_EVAL_ROWS"
+    - >-
+      uv run --no-sync python scripts/eval_generation.py
+      --input "$SQM_APPROVED_EVAL_ROWS"
+      --output reports/golden.json --run-live
+  artifacts:
+    when: always
+    paths: [reports/golden.json]
+    expire_in: 30 days

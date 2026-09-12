@@ -18,6 +18,7 @@ from sklearn.metrics import (
     brier_score_loss,
     mean_absolute_error,
     r2_score,
+    recall_score,
     roc_auc_score,
 )
 from sklearn.pipeline import Pipeline
@@ -138,6 +139,12 @@ def run(df, reg_params=None, clf_params=None):
         rows.append(
             {
                 "fold": k,
+                "n_test": len(te),
+                "positive_test": int(y_clf.iloc[te].sum()),
+                "screen_threshold": 0.04,
+                "recall_sev3": recall_score(
+                    y_clf.iloc[te], p >= 0.04
+                ),
                 "roc_auc": roc_auc_score(y_clf.iloc[te], p),
                 "pr_auc": average_precision_score(
                     y_clf.iloc[te], p
