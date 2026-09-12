@@ -1,0 +1,12 @@
+# Optional Chapter 19 orchestration environment, Python 3.12.
+anthropic==1.5.0
+langgraph==1.2.11
+langgraph-checkpoint-sqlite==3.1.1
+autogen-core==0.7.5
+crewai==1.15.21
+pytest==9.1.1
+pydantic-settings==2.15.0
+structlog==26.1.0
+sqlalchemy==2.0.52
+psycopg[binary]==3.3.5
+rapidfuzz==3.14.6

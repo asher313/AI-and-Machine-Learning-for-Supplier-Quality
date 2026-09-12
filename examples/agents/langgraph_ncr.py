@@ -1,103 +1,53 @@
-# Chapter 19 — 19.4 LangGraph
-# examples/agents/langgraph_ncr.py  (snapshot; see note
-# above. parse_severity(reply) is a four-line helper that
-# reads the severity out of the classifier's reply and
-# returns 0 when it cannot find one.)
-import operator
-from typing import Annotated, TypedDict
+"""LangGraph orchestration of the same bounded NCR loop."""
 
-from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import HumanMessage, ToolMessage
-from langchain_core.tools import tool
-from langgraph.graph import END, StateGraph
+import argparse
+from typing import TypedDict
 
-from sqm_ai.llm import MODELS
+from langgraph.graph import END, START, StateGraph
+
+from sqm_ai.agent.replay import load_replay, restore, snapshot
 
 
-class AgentState(TypedDict):
-    messages: Annotated[list, operator.add]   # accumulates
-    ncr_id: str
-    supplier_id: str
-    severity: int
+class State(TypedDict):
+    run: dict
+    route: str
 
 
-@tool
-def get_supplier_history(supplier_id: str) -> str:
-    """Supplier nonconformance history, last 90 days."""
-    return f"{supplier_id}: 3 dimensional NCRs in 90 days."
+def build_graph(
+    scope, call, *, checkpointer=None, interrupt_after=None
+):
+    def step(state):
+        run = restore(state["run"], scope)
+        route = run.advance(call)
+        return {"run": snapshot(run), "route": route}
 
-
-@tool
-def draft_car(
-    ncr_id: str, supplier_id: str, root_cause: str
-) -> str:
-    """Open a corrective action request draft."""
-    return f"CAR draft opened for {ncr_id}."
-
-
-tools = [get_supplier_history, draft_car]
-llm = ChatAnthropic(model=MODELS["standard"]).bind_tools(tools)
-
-
-def classify_node(state: AgentState) -> dict:
-    reply = llm.invoke(state["messages"])
-    return {
-        "messages": [reply],
-        "severity": parse_severity(reply),
-    }
-
-
-def investigate_node(state: AgentState) -> dict:
-    return {"messages": [llm.invoke(state["messages"])]}
-
-
-def tool_node(state: AgentState) -> dict:
-    by_name = {t.name: t for t in tools}
-    out = []
-    for call in state["messages"][-1].tool_calls:
-        result = by_name[call["name"]].invoke(call["args"])
-        out.append(ToolMessage(
-            content=str(result), tool_call_id=call["id"],
-        ))
-    return {"messages": out}
-
-
-def car_node(state: AgentState) -> dict:
-    nudge = HumanMessage(
-        content="Severity is 3 or more. Draft the CAR."
+    graph = StateGraph(State)
+    graph.add_node("step", step)
+    graph.add_edge(START, "step")
+    graph.add_conditional_edges(
+        "step",
+        lambda s: s["route"],
+        {"continue": "step", "done": END},
     )
-    return {"messages": [llm.invoke(state["messages"] + [nudge])]}
+    return graph.compile(
+        checkpointer=checkpointer, interrupt_after=interrupt_after
+    )
 
 
-def route(state: AgentState) -> str:
-    last = state["messages"][-1]
-    if getattr(last, "tool_calls", None):
-        return "tools"
-    if state["severity"] >= 3:
-        return "car"
-    return END
+def execute(run, call):
+    app = build_graph(run.tools, call)
+    result = app.invoke(
+        {"run": snapshot(run), "route": "continue"},
+        config={"recursion_limit": run.max_steps + 2},
+    )
+    return result["run"]
 
 
-graph = StateGraph(AgentState)
-graph.add_node("classify", classify_node)
-graph.add_node("investigate", investigate_node)
-graph.add_node("tools", tool_node)
-graph.add_node("car", car_node)
-
-graph.set_entry_point("classify")
-graph.add_edge("classify", "investigate")
-graph.add_conditional_edges(
-    "investigate", route,
-    {"tools": "tools", "car": "car", END: END},
-)
-graph.add_edge("tools", "investigate")
-graph.add_edge("car", END)
-
-app = graph.compile()
-
-result = app.invoke({
-    "messages": [HumanMessage(content="Process NCR-2026-0042")],
-    "ncr_id": "NCR-2026-0042",
-    "supplier_id": "S-0417",
-    "severity": 0,
-})
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--input", default="data/agents/replay.json"
+    )
+    args = parser.parse_args()
+    run, call = load_replay(args.input)
+    print(execute(run, call)["answer"])

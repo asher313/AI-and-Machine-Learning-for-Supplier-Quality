@@ -1,74 +1,71 @@
-# Chapter 19 — 19.5 AutoGen
-# examples/agents/autogen_ncr.py  (snapshot; see 19.4 note)
-import os
+"""AutoGen Core 0.7 replay: explicit runtime messages, no selector-model overhead."""
 
-import autogen
+import argparse
+import asyncio
+from dataclasses import dataclass
 
-from sqm_ai.agent.tools import draft_car, get_supplier_history
-from sqm_ai.llm import MODELS
-
-config_list = [{
-    "model": MODELS["standard"],
-    "api_key": os.environ["ANTHROPIC_API_KEY"],
-    "api_type": "anthropic",
-}]
-llm_config = {"config_list": config_list}
-
-classifier = autogen.AssistantAgent(
-    name="classifier",
-    system_message=(
-        "You classify NCRs. Reply with category (cosmetic, "
-        "dimensional, material, functional) and severity 1-5."
-    ),
-    llm_config=llm_config,
+from autogen_core import (
+    AgentId,
+    MessageContext,
+    RoutedAgent,
+    SingleThreadedAgentRuntime,
+    message_handler,
 )
 
-investigator = autogen.AssistantAgent(
-    name="investigator",
-    system_message=(
-        "You pull supplier history and propose a disposition."
-    ),
-    llm_config=llm_config,
-)
-
-car_writer = autogen.AssistantAgent(
-    name="car_writer",
-    system_message=(
-        "You draft corrective action requests. Speak only "
-        "when severity is 3 or higher."
-    ),
-    llm_config=llm_config,
-)
-
-proxy = autogen.UserProxyAgent(
-    name="proxy",
-    human_input_mode="NEVER",
-    code_execution_config=False,
-)
+from sqm_ai.agent.replay import load_replay, restore, snapshot
 
 
-@investigator.register_for_llm(
-    description="Supplier NCR history, last 90 days"
-)
-@proxy.register_for_execution()
-def history_tool(supplier_id: str) -> str:
-    return get_supplier_history(supplier_id)
+@dataclass
+class Advance:
+    state: dict
 
 
-chat = autogen.GroupChat(
-    agents=[proxy, classifier, investigator, car_writer],
-    messages=[],
-    max_round=12,
-    speaker_selection_method="auto",   # a model picks
-)
-manager = autogen.GroupChatManager(
-    groupchat=chat, llm_config=llm_config,
-)
+@dataclass
+class Advanced:
+    state: dict
+    route: str
 
-proxy.initiate_chat(
-    manager,
-    message=(
-        "Process NCR-2026-0042 from supplier S-0417: hole "
-        "position 2 mm out of tolerance, 12 units."
-    ),
-)
+
+class NCRAgent(RoutedAgent):
+    def __init__(self, scope, call):
+        super().__init__("Bounded NCR proposal agent")
+        self.scope, self.call = scope, call
+
+    @message_handler
+    async def advance(
+        self, message: Advance, ctx: MessageContext
+    ) -> Advanced:
+        run = restore(message.state, self.scope)
+        route = await asyncio.to_thread(run.advance, self.call)
+        return Advanced(snapshot(run), route)
+
+
+async def execute(run, call):
+    runtime = SingleThreadedAgentRuntime()
+    await NCRAgent.register(
+        runtime, "ncr", lambda: NCRAgent(run.tools, call)
+    )
+    runtime.start()
+    state = snapshot(run)
+    try:
+        for _ in range(run.max_steps):
+            result = await runtime.send_message(
+                Advance(state), AgentId("ncr", "teaching_run")
+            )
+            state = result.state
+            if result.route == "done":
+                return state
+        raise RuntimeError("AutoGen host step budget exhausted")
+    finally:
+        await runtime.stop_when_idle()
+        await runtime.close()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--input", default="data/agents/replay.json"
+    )
+    args = parser.parse_args()
+    run, call = load_replay(args.input)
+    print(asyncio.run(execute(run, call))["answer"])
