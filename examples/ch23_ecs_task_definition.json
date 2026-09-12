@@ -1,25 +1,23 @@
 {
   "family": "ncr-classifier",
   "taskRoleArn": "$TASK_ROLE_ARN",
+  "executionRoleArn": "$EXECUTION_ROLE_ARN",
+  "requiresCompatibilities": ["FARGATE"],
   "networkMode": "awsvpc",
   "cpu": "1024",
   "memory": "2048",
   "containerDefinitions": [{
     "name": "api",
-    "image": "$ECR_HOST/sqm-ai/ncr-classifier:$SHA",
+    "essential": true,
+    "image": "$APP_IMAGE_DIGEST",
     "portMappings": [{"containerPort": 8000}],
-    "environment": [
-      {"name": "LOG_LEVEL", "value": "INFO"}
-    ],
-    "secrets": [{
-      "name": "ANTHROPIC_API_KEY",
-      "valueFrom": "$ANTHROPIC_SECRET_ARN"
-    }],
+    "environment": [{"name": "LOG_LEVEL", "value": "INFO"}],
+    "secrets": [{"name": "ANTHROPIC_API_KEY", "valueFrom": "$ANTHROPIC_SECRET_ARN"}],
     "logConfiguration": {
       "logDriver": "awslogs",
       "options": {
         "awslogs-group": "/ecs/ncr-classifier",
-        "awslogs-region": "us-east-2",
+        "awslogs-region": "$AWS_REGION",
         "awslogs-stream-prefix": "ecs"
       }
     }

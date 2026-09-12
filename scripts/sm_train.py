@@ -1,39 +1,80 @@
-# scripts/sm_train.py
-# TODO(book): condensed in Chapter 23 — sample_batch is
-# a payload the reader supplies. Complete before
-# production use.
-from sagemaker import get_execution_role
-from sagemaker.pytorch import PyTorch
+"""Prepare a SageMaker Build 1 training request; --submit explicitly starts billing."""
 
-estimator = PyTorch(
-    entry_point="train.py",
-    source_dir="src/sqm_ai/build2",
-    role=get_execution_role(),
-    framework_version="2.4.0",
-    py_version="py312",
-    instance_type="ml.g5.xlarge",
-    instance_count=1,
-    hyperparameters={
-        "epochs": 10,
-        "batch_size": 64,
-        "lr": 1e-3,
-    },
-    output_path="s3://northlake-sqm-models/defect/",
-    use_spot_instances=True,
-    max_run=3600,
-    max_wait=7200,
-    tags=[{"Key": "Project", "Value": "Build2"}],
-)
+import argparse
+import json
+from pathlib import Path
 
-estimator.fit({
-    "train": "s3://northlake-sqm-data/defect/train/",
-    "validation": "s3://northlake-sqm-data/defect/val/",
-})
 
-predictor = estimator.deploy(
-    initial_instance_count=1,
-    instance_type="ml.m6i.large",
-    endpoint_name="defect-predictor-shadow",
-)
-print(predictor.predict(sample_batch))
-predictor.delete_endpoint()   # endpoints bill hourly
+def request(config):
+    if "@sha256:" not in config["image_uri"]:
+        raise ValueError(
+            "reviewed immutable training image required"
+        )
+    return {
+        "TrainingJobName": config["job_name"],
+        "RoleArn": config["role_arn"],
+        "AlgorithmSpecification": {
+            "TrainingImage": config["image_uri"],
+            "TrainingInputMode": "File",
+        },
+        "InputDataConfig": [
+            {
+                "ChannelName": "train",
+                "DataSource": {
+                    "S3DataSource": {
+                        "S3DataType": "S3Prefix",
+                        "S3Uri": config["input_s3_uri"],
+                        "S3DataDistributionType": "FullyReplicated",
+                    }
+                },
+            }
+        ],
+        "OutputDataConfig": {
+            "S3OutputPath": config["output_s3_uri"],
+            "KmsKeyId": config["kms_key_arn"],
+        },
+        "ResourceConfig": {
+            "InstanceType": config.get(
+                "instance_type", "ml.m5.xlarge"
+            ),
+            "InstanceCount": 1,
+            "VolumeSizeInGB": 30,
+            "VolumeKmsKeyId": config["kms_key_arn"],
+        },
+        "VpcConfig": {
+            "Subnets": config["subnet_ids"],
+            "SecurityGroupIds": config["security_group_ids"],
+        },
+        "StoppingCondition": {"MaxRuntimeInSeconds": 3600},
+        "EnableNetworkIsolation": True,
+        "EnableManagedSpotTraining": False,
+        "Tags": [
+            {"Key": "Project", "Value": "SupplierQualityBook"}
+        ],
+    }
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--config", type=Path, required=True)
+    p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--submit", action="store_true")
+    a = p.parse_args()
+    config = json.loads(a.config.read_text())
+    payload = request(config)
+    a.out.parent.mkdir(parents=True, exist_ok=True)
+    a.out.write_text(json.dumps(payload, indent=2) + "\n")
+    if a.submit:
+        import boto3
+
+        print(
+            boto3.client(
+                "sagemaker", region_name=config["region"]
+            ).create_training_job(**payload)["TrainingJobArn"]
+        )
+    else:
+        print("Request saved; no training job submitted.")
+
+
+if __name__ == "__main__":
+    main()

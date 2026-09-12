@@ -1,26 +1,9 @@
 {
   "Version": "2012-10-17",
   "Statement": [
-    {
-      "Sid": "ReadFeatures",
-      "Effect": "Allow",
-      "Action": ["s3:GetObject", "s3:ListBucket"],
-      "Resource": [
-        "arn:aws:s3:::northlake-sqm-data",
-        "arn:aws:s3:::northlake-sqm-data/features/*"
-      ]
-    },
-    {
-      "Sid": "WriteModelsEncrypted",
-      "Effect": "Allow",
-      "Action": ["s3:PutObject"],
-      "Resource":
-        "arn:aws:s3:::northlake-sqm-models/*",
-      "Condition": {
-        "StringEquals": {
-          "s3:x-amz-server-side-encryption": "aws:kms"
-        }
-      }
-    }
+    {"Sid": "ListFeaturePrefix", "Effect": "Allow", "Action": "s3:ListBucket", "Resource": "arn:aws:s3:::northlake-sqm-data", "Condition": {"StringLike": {"s3:prefix": ["features", "features/*"]}}},
+    {"Sid": "ReadFeatureObjects", "Effect": "Allow", "Action": "s3:GetObject", "Resource": "arn:aws:s3:::northlake-sqm-data/features/*"},
+    {"Sid": "WriteModelsWithApprovedKey", "Effect": "Allow", "Action": "s3:PutObject", "Resource": "arn:aws:s3:::northlake-sqm-models/*", "Condition": {"StringEquals": {"s3:x-amz-server-side-encryption": "aws:kms", "s3:x-amz-server-side-encryption-aws-kms-key-id": "arn:aws:kms:us-east-2:123456789012:key/00000000-0000-0000-0000-000000000001"}}},
+    {"Sid": "UseApprovedDataKey", "Effect": "Allow", "Action": ["kms:GenerateDataKey", "kms:Decrypt"], "Resource": "arn:aws:kms:us-east-2:123456789012:key/00000000-0000-0000-0000-000000000001", "Condition": {"StringEquals": {"kms:ViaService": "s3.us-east-2.amazonaws.com", "kms:CallerAccount": "123456789012"}}}
   ]
 }

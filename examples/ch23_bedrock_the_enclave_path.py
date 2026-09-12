@@ -1,34 +1,40 @@
-# Chapter 23 — 23.6 Bedrock — The Enclave Path
-# The older path you will still see in existing code.
+# Runtime factory excerpt; same gateway Endpoint contract.
 import json
-import os
+from sqm_ai.gateway.router import Endpoint
+from sqm_ai.aws.enclave import text_response
 
-import boto3
+def runtime_endpoint(config, *, quote, charge, client=None):
+    if client is None:
+        import boto3
+        from botocore.config import Config
 
-# Legacy ids are version-suffixed, not the Mantle ids
-# above; the exact string comes from the console.
-LEGACY_ID = "anthropic.claude-sonnet-5-v1:0"
+        client = boto3.client(
+            "bedrock-runtime",
+            region_name=config.region,
+            config=Config(
+                retries={"total_max_attempts": 1}, read_timeout=60
+            ),
+        )
 
-runtime = boto3.client(
-    "bedrock-runtime",
-    region_name=os.environ["NL_ENCLAVE_REGION"],
-)
+    def invoke(request):
+        body = {k: v for k, v in request.items() if k != "model"}
+        body["anthropic_version"] = "bedrock-2023-05-31"
+        raw = client.invoke_model(
+            modelId=config.model_id,
+            body=json.dumps(body),
+            accept="application/json",
+            contentType="application/json",
+        )
+        try:
+            return text_response(json.loads(raw["body"].read()))
+        finally:
+            raw["body"].close()
 
-body = json.dumps({
-    "anthropic_version": "bedrock-2023-05-31",
-    "max_tokens": 512,
-    "system": "You are an aerospace quality engineer.",
-    "messages": [
-        {"role": "user", "content": "Classify this NCR"},
-    ],
-    "temperature": 0,
-})
-
-raw = runtime.invoke_model(
-    modelId=LEGACY_ID,
-    body=body,
-    accept="application/json",
-    contentType="application/json",
-)
-result = json.loads(raw["body"].read())
-text = result["content"][0]["text"]
+    return Endpoint(
+        "bedrock-runtime:" + config.region,
+        config.model_id,
+        config.approved_levels,
+        invoke,
+        quote,
+        charge,
+    )

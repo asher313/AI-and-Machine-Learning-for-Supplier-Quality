@@ -1,0 +1,10 @@
+# Replace the mutable base tag with an operator-reviewed digest before release.
+FROM python:3.12-slim
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 && rm -rf /var/lib/apt/lists/*
+WORKDIR /opt/ml/code
+COPY pyproject.toml uv.lock ./
+COPY src ./src
+COPY scripts/sagemaker_entrypoint.py ./scripts/sagemaker_entrypoint.py
+RUN pip install --no-cache-dir uv==0.11.7 && uv sync --locked --extra ml
+ENV PYTHONPATH=/opt/ml/code/src
+ENTRYPOINT ["/opt/ml/code/.venv/bin/python", "scripts/sagemaker_entrypoint.py"]
