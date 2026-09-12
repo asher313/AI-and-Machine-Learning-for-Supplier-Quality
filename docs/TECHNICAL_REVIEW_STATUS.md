@@ -17,7 +17,7 @@ All 24 chapters have received technical reading and correction passes. Cross-boo
 
 ## Test counts
 
-After Chapter 23, the main offline suite recorded **230 passed, 23 skipped, 5 deselected**. With the isolated PostgreSQL server, it recorded **246 passed, 7 skipped, 5 deselected**. The seven remaining skips concern optional framework dependencies; the separate framework environment passed **14 tests**, including CAR persistence and the PostgreSQL history contract. These suites overlap and must not be added into a unique-test total. Chapter 24’s pagination test subsequently passed separately. Final focused reconciliation checks are recorded in the review deliverable.
+The final September 12, 2026 run with the isolated PostgreSQL server recorded **247 passed, 7 skipped, 5 deselected**. The earlier offline run without PostgreSQL recorded **230 passed, 23 skipped, 5 deselected** before the final pagination test was added. The seven remaining skips concern optional framework dependencies; the separate framework environment passed **14 tests**, including CAR persistence and the PostgreSQL history contract. These suites overlap and must not be added into a unique-test total. The final 247-test run includes Chapter 24’s two-page SDK pagination test. The final optional-framework rerun passed 14 tests. Final focused reconciliation checks are recorded in the review deliverable.
 
 Critical Ruff checks (`E9,F63,F7,F82`) passed for package, tests, scripts, and Lambda sources. This is not a claim that all formatting/style rules pass for instructional fragments.
 
