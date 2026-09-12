@@ -1,4 +1,3 @@
-# Appendix D — D.2 The Eleven-Step sklearn Template (Chapter 7.2)
 import json
 import joblib
 import pandas as pd

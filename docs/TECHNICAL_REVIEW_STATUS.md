@@ -1,30 +1,28 @@
-# Technical-review checkpoint
+# September 2026 technical review — validation record
 
-The `technical-review-2026-09` branch is an ongoing textbook/companion review.
-The complete manuscript and KDP layout are not yet finalized. Chapters 1–17
-have received technical reading and correction passes; later chapters and
-cross-book metadata still require review. This is not a claim that every
-external-service Build or the entire repository test suite passes.
+All 24 chapters have received technical reading and correction passes. Cross-book reconciliation and final manuscript production are separate from software validation; this file does not certify publication layout or deployed operation.
 
-Verified local work includes:
+## Verified execution
 
-- All four requested synthetic numeric fixtures, with independent count,
-  statistical, chronology, and feature checks.
-- Default five-fold Build 1 training and scoring of all 1,800 suppliers.
-- Five-fold, 20-epoch MLP comparison with independent checkpoint selection.
-- PyTorch training, architecture, causal-mask, and serialization checks.
-- Tiny offline category and severity Trainer workflows and response validation.
-- Full default synthetic Build 2 walkthrough, ONNX parity, and edge checks.
-  Its predictive performance is poor; see BUILD2_RUN.md.
-- Eleven PostgreSQL integration checks on isolated disposable test databases.
-- Scoped dense, sparse, final-content, and parent retrieval, with a generated
-  offline indexing walkthrough. Neural retrieval quality remains unevaluated.
-- Chapter 15 response/retry/cache boundaries and Chapter 16 triage composition,
-  with generated offline replay fixtures and explicit opt-in live evaluation.
+- Four requested numeric fixture families, with count, chronology, feature, and statistical contracts; generated data remain outside Git.
+- Default five-fold Build 1 training and 1,800-supplier scoring; a separate five-fold, 20-epoch MLP comparison. See [synthetic_build1_mlp_run.json](synthetic_build1_mlp_run.json).
+- Full default Build 2 training (500 trees, 30 epochs), ONNX parity, and raw-window edge checks. Its test caught 0 of 32 failures and raised 0 holds; precision is undefined. **Prediction targets failed.** See [synthetic_build2_run.json](synthetic_build2_run.json).
+- PyTorch architecture, masks, training, serialization, and small offline transfer-learning trainer contracts.
+- Build 3’s 20-record shadow replay; Build 4’s 13-document/25-chunk scoped lexical replay; Build 5’s persistent review pause/resume; Build 6’s constructed 33/8 blocks and one allowed local response. All make zero generation API calls.
+- Real PostgreSQL 16.15/pgvector checks in isolated UUID-named databases: source extraction, date/label rules, dense/sparse/final/parent authorization, atomic supersession, scoped histories, mature CAR recurrence, gateway audit and concurrent reservations.
+- All four actual orchestration runtimes using one guarded scripted kernel, including persisted LangGraph resume. The optional framework environment is frozen in `requirements-agents-lock.txt`.
+- AWS contract checks with Botocore Stubber and service request-shape validation. No AWS resources created. The training container was not built; an external HTTP application is still needed for the serving-manifest examples.
+- Fresh `uv sync --locked --extra ml` installation on macOS. The 30-tree CI rehearsal trained five chronological folds and registered seven verified artifacts; its last fold passed the illustrative gate. Earlier folds did not all pass. No GitLab server pipeline or Linux-container execution is claimed.
+- Real Anthropic SDK pagination through a two-page HTTP mock; no live model availability claim.
 
-Generated datasets and model artifacts remain outside Git. The numeric generator
-and verified teaching workflows do not replace SAP, source documents, cloud
-services, deployment configurations, or approval processes needed by later Builds.
-Paid model calls and large pretrained-model training have not been run in this
-review. Actual synthetic experiment records are stored separately from fictional
-manuscript performance tables.
+## Test counts
+
+After Chapter 23, the main offline suite recorded **230 passed, 23 skipped, 5 deselected**. With the isolated PostgreSQL server, it recorded **246 passed, 7 skipped, 5 deselected**. The seven remaining skips concern optional framework dependencies; the separate framework environment passed **14 tests**, including CAR persistence and the PostgreSQL history contract. These suites overlap and must not be added into a unique-test total. Chapter 24’s pagination test subsequently passed separately. Final focused reconciliation checks are recorded in the review deliverable.
+
+Critical Ruff checks (`E9,F63,F7,F82`) passed for package, tests, scripts, and Lambda sources. This is not a claim that all formatting/style rules pass for instructional fragments.
+
+## Limits of this evidence
+
+The tables describing Northlake business outcomes, latency, costs, and model comparisons are fictional unless explicitly identified as measured synthetic runs. Numeric fixture construction cannot establish causal effects, real defect observability, deployment calibration, or fairness. Scripted responses establish software contracts, not live answer quality or human approval effectiveness.
+
+No paid generation evaluation, production SAP access, licensed standards corpus, large pretrained-model quality experiment, cloud deployment, or operational user acceptance was performed. Production identity/UI integration, monitoring, incident procedures, authorized data handling, retained encryption keys, and genuine domain validation remain organization-specific work described in the chapters and design records.

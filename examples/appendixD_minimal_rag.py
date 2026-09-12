@@ -1,18 +1,17 @@
-# Appendix D — D.3 The Minimal RAG Pipeline (Chapter 17.2)
 # The minimal RAG pipeline. Memorize the four steps.
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-from sqm_ai.llm import MODELS, client
+from sqm_ai.llm import MODELS, client, text_response, with_retry
 
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
 # STEP 1 — the knowledge base, one string per chunk.
 documents = [
-    "AS9100 Rev D 8.4.1 requires the organization to "
-    "ensure externally provided processes conform...",
-    "CAR-2025-0311 root cause: worn drill fixture at "
-    "supplier S-0417; containment was 100% inspection...",
+    "Fictional training manual: an engineer reviews a "
+    "supplier discrepancy before any disposition.",
+    "Fictional CAR-2025-0311 scenario: a worn fixture at "
+    "supplier S-0417 was proposed for investigation.",
     # ...thousands more
 ]
 
@@ -23,6 +22,8 @@ doc_vectors = embedder.encode(
 
 # STEP 3 — embed the question, take the nearest chunks.
 def retrieve(question: str, k: int = 5) -> list[str]:
+    if k < 1:
+        raise ValueError("positive k required")
     q = embedder.encode([question],
                         normalize_embeddings=True)[0]
     sims = doc_vectors @ q          # cosine; normalized
@@ -41,12 +42,11 @@ def answer(question: str) -> str:
     chunks = retrieve(question)
     context = "\n\n".join(
         f"[{i + 1}] {c}" for i, c in enumerate(chunks))
-    response = client.messages.create(
+    response = with_retry(client.messages.create,
         model=MODELS["frontier"],
         max_tokens=1_024,
         system=SYSTEM,
         messages=[{"role": "user", "content":
                    f"Context:\n{context}\n\nQ: {question}"}],
     )
-    return next(
-        b.text for b in response.content if b.type == "text")
+    return text_response(response)

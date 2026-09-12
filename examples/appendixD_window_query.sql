@@ -1,4 +1,3 @@
--- Appendix D — D.5 The Window-Function Query (Chapter 4.3)
 -- Top-3 worst NCRs per supplier
 SELECT supplier_id, ncr_id, severity, cost_impact_usd
 FROM (

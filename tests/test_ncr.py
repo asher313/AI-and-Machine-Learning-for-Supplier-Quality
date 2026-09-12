@@ -12,7 +12,7 @@ def reference_ncr() -> dict:
         "supplier_id": "S-0417",
         "defect_description": "hole position 2 mm out of tol",
         "quantity": 12,
-        "discovered_at": "2026-08-18T09:14:00",
+        "discovered_at": "2026-08-18T10:00:00",
     }
 
 
