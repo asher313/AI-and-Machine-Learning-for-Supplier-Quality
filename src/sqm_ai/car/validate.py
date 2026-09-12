@@ -1,39 +1,72 @@
-# src/sqm_ai/car/validate.py
-from sqm_ai.car.state import CarState
+"""Deterministic shape/reference checks; source entailment still requires review."""
 
-REQUIRED = {
-    "problem": ["problem_statement", "impact"],
-    "root_cause": ["root_causes"],
-    "actions": ["containment", "corrective_actions"],
-    "verify": ["verification_plan"],
+from pydantic import ValidationError
+
+from sqm_ai.car.nodes import SCHEMAS
+
+FIELDS = {
+    "problem": "problem",
+    "root_cause": "root_cause",
+    "actions": "actions",
+    "verify": "verification_plan",
 }
 
 
-def validate_node(state: CarState) -> dict:
-    """Structural checks. Never judges whether text is good."""
-    out = []
-    for node, fields in REQUIRED.items():
-        for f in fields:
-            if not state.get(f):
-                out.append(f"FAIL:{node}:{f} is empty")
-
-    causes = state.get("root_causes") or []
-    if len(causes) < 3:
-        out.append("FAIL:root_cause:fewer than 3 hypotheses")
-    for c in causes:
-        if len(c.whys) != 5:
-            out.append("FAIL:root_cause:not five whys")
-        if any(not w.evidence_ref for w in c.whys):
-            out.append("FAIL:root_cause:a why cites nothing")
-
-    plan = state.get("verification_plan", "")
-    for word in ("sample", "days", "metric"):
-        if word not in plan.lower():
-            out.append(f"FAIL:verify:no {word} in plan")
-
-    bumped = dict(state.get("retries", {}))
-    for w in out:
-        node = w.split(":")[1]
-        bumped[node] = bumped.get(node, 0) + 1
-    # failures replaces; warnings accumulates.
-    return {"failures": out, "warnings": out, "retries": bumped}
+def validate_node(state):
+    failures, gaps = (
+        [],
+        list(state["evidence"].get("investigation_gaps", [])),
+    )
+    ids = {s["id"] for s in state["evidence"]["sources"]}
+    for role, field in FIELDS.items():
+        try:
+            value = (
+                SCHEMAS[role]
+                .model_validate(state.get(field, {}))
+                .model_dump()
+            )
+        except ValidationError:
+            failures.append(
+                {
+                    "owner": role,
+                    "reason": "missing or invalid structured section",
+                }
+            )
+            continue
+        refs = value.get("evidence_refs", [])
+        gaps.extend(value.get("investigation_gaps", []))
+        if role == "root_cause":
+            candidates = [
+                h["candidate_cause"].strip().casefold()
+                for h in value["hypotheses"]
+            ]
+            if len(candidates) != len(set(candidates)):
+                failures.append(
+                    {
+                        "owner": role,
+                        "reason": "duplicate candidate causes",
+                    }
+                )
+            for h in value["hypotheses"]:
+                gaps.extend(h["investigation_gaps"])
+                for why in h["whys"]:
+                    refs += why["evidence_refs"]
+                    if why["investigation_gap"]:
+                        gaps.append(why["investigation_gap"])
+        if any(ref not in ids for ref in refs):
+            failures.append(
+                {
+                    "owner": role,
+                    "reason": "reference is absent from authorized evidence",
+                }
+            )
+    return {
+        "failures": failures,
+        "gaps": list(dict.fromkeys(gaps)),
+        "retry_target": failures[0]["owner"]
+        if failures
+        else None,
+        "warnings": [
+            f"{f['owner']}: {f['reason']}" for f in failures
+        ],
+    }

@@ -1,10 +1,9 @@
-# src/sqm_ai/car/measure.py
+"""Text-change proxy, not an estimate of factual correctness or causal impact."""
+
 from rapidfuzz.distance import Levenshtein
 
 
 def edit_fraction(draft: str, final: str) -> float:
-    """0.0 = accepted verbatim, 1.0 = fully rewritten."""
+    """Character edit distance / longer normalized length, in [0,1]."""
     a, b = " ".join(draft.split()), " ".join(final.split())
-    if not a and not b:
-        return 0.0
-    return Levenshtein.distance(a, b) / max(len(a), len(b))
+    return Levenshtein.normalized_distance(a, b)
