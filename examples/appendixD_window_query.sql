@@ -5,7 +5,8 @@ FROM (
   SELECT supplier_id, ncr_id, severity, cost_impact_usd,
          ROW_NUMBER() OVER (
            PARTITION BY supplier_id
-           ORDER BY severity DESC, cost_impact_usd DESC
+           ORDER BY severity DESC,
+                    cost_impact_usd DESC NULLS LAST, ncr_id
          ) AS rn
   FROM sqm.ncrs
 ) ranked

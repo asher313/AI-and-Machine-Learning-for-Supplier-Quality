@@ -25,7 +25,7 @@ default:
       - .cache/uv
   before_script:
     - pip install --quiet uv
-    - uv sync --frozen
+    - uv sync --locked
 
 # 1 — code quality
 lint:

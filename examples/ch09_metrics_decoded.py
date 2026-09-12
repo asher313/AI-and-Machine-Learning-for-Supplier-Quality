@@ -9,7 +9,7 @@ yhat = (p >= 0.30).astype(int)
 
 print(roc_auc_score(y_test, p))            # ranking
 print(average_precision_score(y_test, p))  # PR-AUC
-print(log_loss(y_test, p))                 # calibration
+print(log_loss(y_test, p))                 # probability quality
 print(confusion_matrix(y_test, yhat))
 print(classification_report(
     y_test, yhat, target_names=["ok", "at risk"]))

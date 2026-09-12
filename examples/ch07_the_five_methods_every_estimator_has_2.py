@@ -1,4 +1,4 @@
-# Chapter 7 — 7.1 The Five Methods Every Estimator Has
+# Chapter 7 — 7.1 Five Common Estimator Methods
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression

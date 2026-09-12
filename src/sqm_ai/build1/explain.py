@@ -1,4 +1,7 @@
-# src/sqm_ai/build1/explain.py
+"""Explain predicted severity-sum harm, before percentile ranking."""
+
+import numpy as np
+import pandas as pd
 import shap
 
 READABLE = {
@@ -19,26 +22,52 @@ READABLE = {
 }
 
 
-def explainer_for(model):
-    """TreeExplainer over the calibrated model's base."""
-    base = model.calibrated_classifiers_[0].estimator
-    return shap.TreeExplainer(base)
+def explainer_for(regressor):
+    """TreeExplainer for the fitted harm regressor's booster."""
+    return shap.TreeExplainer(regressor.named_steps["model"])
 
 
-def top_drivers(explainer, X, i, k=5):
-    sv = explainer.shap_values(X.iloc[[i]])[0]
-    order = sorted(range(len(sv)),
-                   key=lambda j: abs(sv[j]),
-                   reverse=True)[:k]
-    return [
-        {
-            "feature": X.columns[j],
-            "label": READABLE.get(X.columns[j],
-                                  X.columns[j]),
-            "value": float(X.iloc[i, j]),
-            "impact": round(float(sv[j]), 3),
-            "direction": ("increases risk" if sv[j] > 0
-                          else "decreases risk"),
-        }
-        for j in order
-    ]
+def transformed_frame(regressor, X):
+    prep = regressor.named_steps["prep"]
+    return pd.DataFrame(
+        prep.transform(X),
+        columns=prep.get_feature_names_out(),
+        index=X.index,
+    )
+
+
+def top_drivers(explainer, X, i, k=5, raw=None, values=None):
+    """X is transformed; raw retains human-readable units."""
+    sv = (
+        explainer.shap_values(X.iloc[[i]])[0]
+        if values is None
+        else values
+    )
+    order = np.argsort(-np.abs(sv))[:k]
+    result = []
+    for j in order:
+        name = X.columns[j].split("__", 1)[-1]
+        value = (
+            raw.iloc[i][name]
+            if raw is not None and name in raw.columns
+            else X.iloc[i, j]
+        )
+        if pd.isna(value):
+            value = None
+        elif isinstance(value, np.generic):
+            value = value.item()
+        result.append(
+            {
+                "feature": name,
+                "label": READABLE.get(name, name),
+                "value": value,
+                "impact": float(sv[j]),
+                "impact_units": "raw predicted harm before zero floor",
+                "direction": "increases predicted harm"
+                if sv[j] > 0
+                else "decreases predicted harm"
+                if sv[j] < 0
+                else "no contribution",
+            }
+        )
+    return result

@@ -5,6 +5,7 @@ model.fc = nn.Linear(model.fc.in_features, num_classes)
 optimizer = torch.optim.AdamW(
     [
         {"params": model.conv1.parameters(), "lr": 1e-5},
+        {"params": model.bn1.parameters(), "lr": 1e-5},
         {"params": model.layer1.parameters(), "lr": 1e-5},
         {"params": model.layer2.parameters(), "lr": 1e-4},
         {"params": model.layer3.parameters(), "lr": 1e-4},

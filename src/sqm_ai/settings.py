@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     anthropic_api_key: SecretStr = SecretStr("")
     hana_host: str = "hana.northlake.internal"
+    hana_port: int = 30015
     hana_user: str = "sqm_readonly"
     hana_password: SecretStr = SecretStr("")
     database_url: str = (

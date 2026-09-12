@@ -95,6 +95,9 @@ uv sync --extra ml      # scikit-learn, XGBoost, LightGBM, SHAP, Optuna
 uv sync --extra dl      # PyTorch, transformers, PEFT, ONNX
 ```
 
+On macOS, install OpenMP with `brew install libomp` if XGBoost reports
+that `libomp.dylib` cannot be loaded. See the upstream installation guide.
+
 Then copy the settings template and fill it in:
 
 ```bash

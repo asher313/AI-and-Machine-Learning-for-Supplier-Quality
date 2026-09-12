@@ -14,7 +14,7 @@ sched = ls.ReduceLROnPlateau(
 )
 # call sched.step(val_loss) for this one, with the metric
 
-# warmup then cosine: required for transformers
+# warmup then cosine: common in transformer recipes
 def warmup_cosine(step, warmup=1000, total=100_000):
     if step < warmup:
         return step / warmup

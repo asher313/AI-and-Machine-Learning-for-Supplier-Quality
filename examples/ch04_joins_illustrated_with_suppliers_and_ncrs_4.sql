@@ -6,6 +6,7 @@ SELECT a.supplier_id,
 FROM sqm.ncrs a
 JOIN sqm.ncrs b
   ON b.supplier_id = a.supplier_id
- AND b.discovered_at > a.discovered_at
+ AND (b.discovered_at, b.ncr_id)
+       > (a.discovered_at, a.ncr_id)
  AND b.discovered_at <= a.discovered_at + INTERVAL '30 days'
 ORDER BY a.supplier_id, a.discovered_at;

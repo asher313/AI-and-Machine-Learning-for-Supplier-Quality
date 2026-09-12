@@ -1,0 +1,51 @@
+{
+  "synthetic": true,
+  "scope": "single-cell pilot test; not an all-cell production validation",
+  "period_cutoffs": [
+    "2025-11-26 12:17:04",
+    "2025-12-18 03:13:04",
+    "2026-01-30 09:42:24",
+    "2026-03-03 20:13:52"
+  ],
+  "stage1_fit_rows": 223586,
+  "stage1_calibration_rows": 55558,
+  "stage2_fit_rows": 473,
+  "stage2_validation_rows": 332,
+  "test_rows": 6000,
+  "validation_flag_fraction_limit": 0.02631578947368421,
+  "stage1_test": {
+    "average_precision": 0.007556714566039237,
+    "flag_rate": 0.058833333333333335,
+    "recall": 0.0625,
+    "threshold": 0.435036101937294
+  },
+  "combined_test": {
+    "flags": 0,
+    "failures": 32,
+    "caught": 0,
+    "recall": 0.0,
+    "precision": null,
+    "error_cost": 131200
+  },
+  "versions": {
+    "numpy": "2.5.3",
+    "pandas": "3.0.5",
+    "scikit-learn": "1.9.1",
+    "xgboost": "3.4.1",
+    "torch": "2.14.0",
+    "onnx": "1.22.0",
+    "onnxruntime": "1.30.0",
+    "onnxmltools": "1.16.0"
+  },
+  "generator_manifest_sha256": "8022a82a701b3fd5732b3012b54f4fadb285005cb29ac8c9ae1b4cf476eb692b",
+  "source_sha256": {
+    "cnc/run_build2.py": "b2a491342019ed10cad70fe63e3b5763e0cee10f4791d3dee93baa4acf29305b",
+    "cnc/preprocessing.py": "0e1a1194c7783ab7bf4679243bf3b3e60a5c57916433bc79f74614dda152145f",
+    "cnc/train_stage1.py": "ee1fca339951488b4a308a55dd73e6409637f6ff01057e4cf3d4abd041d97232",
+    "cnc/train_stage2.py": "edb35eeb070d9326b6b728e920a53befbddc4a7ee2fe4edfffe75f7d5fc2af57",
+    "cnc/edge.py": "84d871905ba6097a2ae4146d1ae963de2795880e5c499dbd5ec40e5e7dd375b1",
+    "cnc/export.py": "f4667c6fdf94697cd5483e23e5b3356034534bc25e678bbb3ab1f68ed2332a09",
+    "dl/train.py": "d49d7627865085da0f3debad806748e0103d9e2bd5ab306845a90e08afe442c5",
+    "dl/cnc_cnn.py": "347da8277517d54b95d59e37a55fdc00d0abe4b3fab7b3efeed7f11102c10a4f"
+  }
+}

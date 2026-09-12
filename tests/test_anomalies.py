@@ -29,5 +29,8 @@ def test_windows_do_not_cross_suppliers():
 
 
 def test_slope_is_negative_when_declining():
-    g = pd.DataFrame({"fpy": np.linspace(0.98, 0.86, 12)})
+    g = pd.DataFrame({
+        "month": pd.date_range("2025-09-01", periods=12, freq="MS"),
+        "fpy": np.linspace(0.98, 0.86, 12),
+    })
     assert fpy_slope(g) < -0.01

@@ -6,9 +6,9 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
-dist.init_process_group(backend="nccl")
 local_rank = int(os.environ["LOCAL_RANK"])
 torch.cuda.set_device(local_rank)
+dist.init_process_group(backend="nccl")
 
 model = model.to(local_rank)
 model = DDP(model, device_ids=[local_rank])

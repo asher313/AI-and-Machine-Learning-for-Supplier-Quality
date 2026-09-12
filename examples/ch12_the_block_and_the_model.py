@@ -1,3 +1,6 @@
+import torch
+import torch.nn as nn
+from sqm_ai.dl.architectures import MultiHeadAttention, FeedForward
 # Chapter 12 — The block, and the model
 class TransformerBlock(nn.Module):
     """Pre-norm attention + feed-forward, both residual."""
@@ -25,7 +28,7 @@ class TransformerBlock(nn.Module):
         attn_out, _ = self.attention(
             normed, normed, normed, mask
         )
-        x = x + self.dropout(attn_out)
+        x = x + attn_out  # attention already applies output dropout
 
         normed = self.norm2(x)
         x = x + self.dropout(self.feed_forward(normed))

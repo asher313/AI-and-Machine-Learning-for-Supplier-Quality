@@ -40,9 +40,9 @@ baseline = Pipeline([
 
 aucs, aps = [], []
 for tr, te in month_folds(df):
-    baseline.fit(X.loc[tr], y.loc[tr])
-    p = baseline.predict_proba(X.loc[te])[:, 1]
-    aucs.append(roc_auc_score(y.loc[te], p))
-    aps.append(average_precision_score(y.loc[te], p))
+    baseline.fit(X.iloc[tr], y.iloc[tr])
+    p = baseline.predict_proba(X.iloc[te])[:, 1]
+    aucs.append(roc_auc_score(y.iloc[te], p))
+    aps.append(average_precision_score(y.iloc[te], p))
 print("ROC-AUC per fold:", [round(a, 3) for a in aucs])
 print("PR-AUC  per fold:", [round(a, 3) for a in aps])

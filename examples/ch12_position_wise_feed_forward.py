@@ -1,3 +1,6 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 # Chapter 12 — Position-wise feed-forward
 class FeedForward(nn.Module):
     """Expand to d_ff, activate, project back to d_model."""

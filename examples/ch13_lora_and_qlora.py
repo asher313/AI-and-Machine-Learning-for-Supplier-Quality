@@ -5,8 +5,8 @@ from transformers import AutoModelForCausalLM
 
 model = AutoModelForCausalLM.from_pretrained(
     "meta-llama/Llama-3.2-1B",
-    torch_dtype=torch.float16,
-    device_map="auto",
+    dtype=torch.float32,  # simple CPU-compatible starting point
+    # Trainer owns placement; use an explicit supported GPU dtype there
 )
 
 lora_config = LoraConfig(

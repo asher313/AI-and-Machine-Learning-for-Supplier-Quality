@@ -28,7 +28,7 @@ def aggregates(x: np.ndarray, name: str) -> dict:
 
 
 def band_energy(x: np.ndarray, name: str) -> dict:
-    """Share of spectral energy in each frequency band."""
+    """Fractions of one-sided squared FFT magnitudes (not physical PSD)."""
     x = x - np.mean(x)
     spec = np.abs(np.fft.rfft(x)) ** 2
     freq = np.fft.rfftfreq(len(x), d=1.0 / FS)

@@ -3,7 +3,9 @@ import optuna
 import xgboost as xgb
 from sklearn.metrics import average_precision_score
 
-from sqm_ai.features import month_folds   # Chapter 7.4
+from sklearn.base import clone
+
+from sqm_ai.features import month_folds, prep   # Chapter 7.4
 
 
 def objective(trial):
@@ -32,12 +34,15 @@ def objective(trial):
         m.fit(X.loc[inner], y.loc[inner],
               eval_set=[(X.loc[hold], y.loc[hold])],
               verbose=False)
-        p = m.predict_proba(X.loc[te])[:, 1]
+        p = m.predict_proba(X.iloc[te])[:, 1]
         scores.append(
-            average_precision_score(y.loc[te], p))
+            average_precision_score(y.iloc[te], p))
     return sum(scores) / len(scores)
 
 
-study = optuna.create_study(direction="maximize")
+study = optuna.create_study(
+    direction="maximize",
+    sampler=optuna.samplers.TPESampler(seed=42),
+)
 study.optimize(objective, n_trials=60)
 print(study.best_params, round(study.best_value, 3))

@@ -6,7 +6,7 @@ SELECT ncr_id, supplier_id, discovered_at, severity,
        ) AS supplier_avg_severity,
        SUM(cost_impact_usd) OVER (
          PARTITION BY supplier_id
-         ORDER BY discovered_at
+         ORDER BY discovered_at, ncr_id
          ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
        ) AS cumulative_cost
 FROM sqm.ncrs;

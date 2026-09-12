@@ -57,13 +57,17 @@ ml = [
     "imbalanced-learn",
 ]
 dl = [
-    "torch>=2.0",
+    "torch>=2.6",
     "transformers",
     "datasets",
     "peft",
     "bitsandbytes",
     "onnx",
     "onnxruntime",
+    "onnxscript",
+    "onnxmltools",
+    "accelerate",
+    "torchvision",
 ]
 
 [build-system]

@@ -18,9 +18,10 @@ def scaled_dot_product_attention(Q, K, V, mask=None):
     scores = Q @ K.transpose(-2, -1)      # (B,h,Tq,Tk)
     scores = scores / math.sqrt(d_k)
     if mask is not None:
-        scores = scores.masked_fill(
-            mask == 0, float("-inf")
-        )
+        allowed = torch.broadcast_to(mask.to(Q.device).bool(), scores.shape)
+        if not allowed.any(dim=-1).all():
+            raise ValueError("every query needs at least one allowed key")
+        scores = scores.masked_fill(~allowed, float("-inf"))
     weights = F.softmax(scores, dim=-1)
     output = weights @ V                  # (B,h,Tq,dv)
     return output, weights

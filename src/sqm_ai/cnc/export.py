@@ -1,52 +1,71 @@
-# sqm_ai/cnc/export.py
+# src/sqm_ai/cnc/export.py
+from pathlib import Path
+
 import numpy as np
 import onnxruntime as ort
 import torch
 from onnxmltools.convert import convert_xgboost
-from onnxconverter_common.data_types import FloatTensorType
-
-from sqm_ai.dl.cnc_cnn import CNCWindowNet
+from onnxmltools.convert.common.data_types import (
+    FloatTensorType,
+)
 
 
 def export_stage1(model, n_features: int, path: str):
-    initial = [("input", FloatTensorType([None,
-                                          n_features]))]
+    """Export the numeric XGBClassifier after persisted preprocessing."""
     onx = convert_xgboost(
         model,
-        initial_types=initial,
-        # plain arrays out, not a class->prob dict
-        options={id(model): {"zipmap": False}},
+        initial_types=[
+            ("input", FloatTensorType([None, n_features]))
+        ],
     )
-    with open(path, "wb") as fh:
-        fh.write(onx.SerializeToString())
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_bytes(onx.SerializeToString())
 
 
-def export_stage2(model: CNCWindowNet, path: str):
-    model.eval()
-    dummy = torch.randn(1, 5, 512)
+def export_stage2(model, path: str):
+    model = model.cpu().eval()
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    dummy = torch.randn(2, 5, 512)
     torch.onnx.export(
-        model, (dummy,), path,
+        model,
+        (dummy,),
+        path,
+        dynamo=True,
         input_names=["window"],
         output_names=["logit"],
-        dynamic_axes={
-            "window": {0: "batch"},
-            "logit": {0: "batch"},
-        },
+        dynamic_shapes=(
+            {0: torch.export.Dim("batch", min=1)},
+        ),
     )
 
 
-def assert_parity(model, path: str, sample: np.ndarray):
-    """The exported model must match the trained one."""
-    model.eval()
+def assert_stage1_parity(model, path, sample):
+    sample = np.asarray(sample, dtype=np.float32)
+    sess = ort.InferenceSession(
+        str(path), providers=["CPUExecutionProvider"]
+    )
+    got = sess.run(None, {"input": sample})[1][:, 1]
+    np.testing.assert_allclose(
+        model.predict_proba(sample)[:, 1],
+        got,
+        rtol=1e-5,
+        atol=1e-5,
+    )
+
+
+def assert_parity(model, path, sample):
+    model = model.cpu().eval()
+    sample = np.asarray(sample, dtype=np.float32)
     with torch.no_grad():
-        want = model(
-            torch.tensor(sample, dtype=torch.float32)
-        ).numpy()
-    sess = ort.InferenceSession(path)
-    got = sess.run(
-        None, {sess.get_inputs()[0].name:
-               sample.astype(np.float32)}
-    )[0].squeeze(-1)
+        want = (
+            model(torch.from_numpy(sample))
+            .numpy()
+            .reshape(-1)
+        )
+    sess = ort.InferenceSession(
+        str(path), providers=["CPUExecutionProvider"]
+    )
+    got = sess.run(None, {"window": sample})[0].reshape(-1)
     np.testing.assert_allclose(
         want, got, rtol=1e-5, atol=1e-5
     )

@@ -1,58 +1,76 @@
-# sqm_ai/cnc/edge.py
+# src/sqm_ai/cnc/edge.py
+"""Local two-stage suggestions from a trusted, checksummed artifact bundle."""
+
+import hashlib
+import json
+from pathlib import Path
+
+import joblib
 import numpy as np
 import onnxruntime as ort
+from scipy.special import expit
 
 from sqm_ai.cnc.features import cycle_features, frame
-
-STAGE1_THRESHOLD = 0.038
-STAGE2_THRESHOLD = 0.31
-
-
-def fit_window(x: np.ndarray, n: int = 512) -> np.ndarray:
-    """Pad with the edge value, or truncate, to n samples."""
-    if x.shape[1] >= n:
-        return x[:, :n]
-    pad = n - x.shape[1]
-    return np.pad(x, ((0, 0), (0, pad)), mode="edge")
+from sqm_ai.cnc.preprocessing import prepare_window, transform
 
 
 class CycleScorer:
-    """Two-stage scoring for one cell, no network needed."""
-
-    def __init__(
-        self,
-        stage1_path: str,
-        stage2_path: str,
-        model_version: str,
-    ):
-        self.s1 = ort.InferenceSession(stage1_path)
-        self.s2 = ort.InferenceSession(stage2_path)
-        self.model_version = model_version
+    def __init__(self, artifact_dir):
+        folder = Path(artifact_dir)
+        self.config = json.loads(
+            (folder / "bundle.json").read_text()
+        )
+        for name, digest in self.config["sha256"].items():
+            if (
+                Path(name).name != name
+                or hashlib.sha256(
+                    (folder / name).read_bytes()
+                ).hexdigest()
+                != digest
+            ):
+                raise ValueError("artifact checksum mismatch")
+        # Only load bundles from a trusted source; hashes do not confer trust.
+        self.prep = joblib.load(
+            folder / "preprocessing.joblib"
+        )
+        self.s1 = ort.InferenceSession(
+            str(folder / "stage1.onnx"),
+            providers=["CPUExecutionProvider"],
+        )
+        self.s2 = ort.InferenceSession(
+            str(folder / "stage2.onnx"),
+            providers=["CPUExecutionProvider"],
+        )
 
     def score(
         self, window: np.ndarray, context: dict
     ) -> dict:
+        cfg = self.config
+        prepared = prepare_window(
+            window, cfg["channel_mean"], cfg["channel_scale"]
+        )
         row = frame([cycle_features(window, context)])
-        x = row.select_dtypes("number").to_numpy(
-            dtype=np.float32
-        )
-        p1 = float(
-            self.s1.run(None, {"input": x})[1][0][1]
-        )
+        x = transform(self.prep, row)
+        p1 = float(self.s1.run(None, {"input": x})[1][0, 1])
+        if not np.isfinite(p1) or not 0 <= p1 <= 1:
+            raise ValueError("invalid stage-1 score")
         result = {
-            "model_version": self.model_version,
-            "stage1_prob": p1,
-            "stage2_prob": None,
-            "decision": "pass",
+            "model_version": cfg["model_version"],
+            "stage1_score": p1,
+            "stage2_score": None,
+            "decision": "no_model_flag",
         }
-        if p1 < STAGE1_THRESHOLD:
+        if p1 < cfg["stage1_threshold"]:
             return result
-        win = fit_window(window)[None].astype(np.float32)
         logit = float(
-            self.s2.run(None, {"window": win})[0][0]
+            self.s2.run(None, {"window": prepared[None]})[
+                0
+            ].reshape(-1)[0]
         )
-        p2 = 1.0 / (1.0 + np.exp(-logit))
-        result["stage2_prob"] = p2
-        if p2 >= STAGE2_THRESHOLD:
+        if not np.isfinite(logit):
+            raise ValueError("invalid stage-2 logit")
+        p2 = float(expit(logit))
+        result["stage2_score"] = p2
+        if p2 >= cfg["stage2_threshold"]:
             result["decision"] = "qa_hold"
         return result

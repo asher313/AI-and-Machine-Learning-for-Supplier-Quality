@@ -1,0 +1,135 @@
+{
+  "synthetic": true,
+  "interpretation": "Execution validation on constructed teaching data, not empirical supplier performance or a reproduction of fictional score tables.",
+  "data_manifest": {
+    "generator_version": 1,
+    "seed": 20260911,
+    "synthetic": true,
+    "data_complete_through": "2026-09-01",
+    "event_history_start": "2023-06-01",
+    "supplier_month_rows": 62518,
+    "labeled_rows": 57118,
+    "positives": 5483,
+    "ncr_export_rows": 29412,
+    "files": {
+      "suppliers.parquet": "196583a46a45cbf86b669c7200e705521cc1c4dd4cd0ffdbaffafeefc9fa284b",
+      "ncrs.parquet": "2bd80cbbbacc609abd9de7716a421eec3884f1fb88027dd1597dfed072c43b08",
+      "ncrs_2025-09_2026-08.csv": "65273fb6e12e1760d0188daa29fa852527b94b2e0368904c052e1424525d5d61",
+      "supplier_month.parquet": "3002fa2aa8950b9b9ff0b4455213681cad5e5795f978601d57ff5f724bd8c317",
+      "supplier_month_features.parquet": "3002fa2aa8950b9b9ff0b4455213681cad5e5795f978601d57ff5f724bd8c317",
+      "supplier_month_all.parquet": "1a03bcaafb6ec1a69fc203c1beb6a4709eb999e6ad1835202df2ec7f30d3341c",
+      "cobalt_lot_fpy.csv": "c370ebf3fff2e2ccce7ca8128039363b0a793c64ec08a4b934e5a70a90c99a93"
+    }
+  },
+  "build1": {
+    "parameters": "Default 1200 regression trees / 1500 classification trees; no override",
+    "folds": [
+      {
+        "fold": 1,
+        "roc_auc": 0.9803239482,
+        "pr_auc": 0.7008397753,
+        "brier": 0.0267676939,
+        "mae": 1.5074971216,
+        "r2": 0.971424062,
+        "spearman": 0.5595465211
+      },
+      {
+        "fold": 2,
+        "roc_auc": 0.9039461224,
+        "pr_auc": 0.6029826036,
+        "brier": 0.0402260657,
+        "mae": 2.4958126084,
+        "r2": 0.8868900555,
+        "spearman": 0.2991957887
+      },
+      {
+        "fold": 3,
+        "roc_auc": 0.882867735,
+        "pr_auc": 0.60824969,
+        "brier": 0.0448761213,
+        "mae": 2.9822189843,
+        "r2": 0.8466978403,
+        "spearman": 0.4072280024
+      },
+      {
+        "fold": 4,
+        "roc_auc": 0.9530788733,
+        "pr_auc": 0.669741461,
+        "brier": 0.030774393,
+        "mae": 3.2395938996,
+        "r2": 0.9505512862,
+        "spearman": 0.6917494956
+      },
+      {
+        "fold": 5,
+        "roc_auc": 0.9796997095,
+        "pr_auc": 0.6799270497,
+        "brier": 0.0271293341,
+        "mae": 1.6326823451,
+        "r2": 0.9442582748,
+        "spearman": 0.5593183929
+      }
+    ],
+    "metadata": {
+      "training_data_sha256": "3002fa2aa8950b9b9ff0b4455213681cad5e5795f978601d57ff5f724bd8c317",
+      "training_data_complete_through": "2026-09-01",
+      "model_version": "3dcd73b33990",
+      "artifact_sha256": {
+        "risk_regressor.joblib": "9f0ec8a9b0a8867f786977568540912cc6d11f463ece39966e7c3be16c2461bc",
+        "risk_regressor.json": "ae3fd74ace96fc78d3ad3d6c77040e9edba5f0166797c1eb59459a9524c317dc",
+        "risk_classifier_calibrated.joblib": "22eb2634ac9d837f1d4394f8a7bc0a91c56156d6fdbc902a7c4251ea5b852c74",
+        "feature_list.json": "b1de528291a9fe00ae388a198e1f9c7be6b6f6bb77b6c6faa1aead76ff4f6125",
+        "threshold.json": "50623f68077b6146677d6f6173d92c2a479f9d1a8f8f8cd8deaf1d0a969ad9b0"
+      },
+      "source_sha256": {
+        "build1/train.py": "d3ae43cb473a9e9cdebdd74705dbee609bbeb8db43d07d6af9bcd6e8e6801180",
+        "build1/features.py": "6a1c4429ef48d9d9db3f363706bd5826f917eaee768c207c96e12e60173969ef",
+        "build1/score_suppliers.py": "02865ce284e28f5c021d9c4d9683bbb31313d012b49afd6dfaa155642a72cef9",
+        "build1/explain.py": "b9feef5d8a3a8a592ebde30932efa30d4485ea079ac0864ba76dfa56af7d41f2",
+        "features.py": "c2249500ffbaee53bd4f3e47f47a298ecc2e7f85747466ac05675e9eebbc17f3"
+      },
+      "trees_override": null,
+      "intended_use": "Synthetic teaching demonstration; human review only"
+    }
+  },
+  "mlp": {
+    "epochs": 20,
+    "seed_rule": "42 + fold",
+    "device": "cpu",
+    "folds": [
+      {
+        "fold": 1,
+        "roc_auc": 0.9799377953053712,
+        "average_precision": 0.6780652379902575
+      },
+      {
+        "fold": 2,
+        "roc_auc": 0.9127657142857142,
+        "average_precision": 0.6031666362825533
+      },
+      {
+        "fold": 3,
+        "roc_auc": 0.9013131939356365,
+        "average_precision": 0.6334346867506563
+      },
+      {
+        "fold": 4,
+        "roc_auc": 0.9605345210831059,
+        "average_precision": 0.7031847677641468
+      },
+      {
+        "fold": 5,
+        "roc_auc": 0.9804888777177329,
+        "average_precision": 0.6994385571641164
+      }
+    ]
+  },
+  "versions": {
+    "numpy": "2.5.3",
+    "pandas": "3.0.5",
+    "scikit-learn": "1.9.1",
+    "xgboost": "3.4.1",
+    "torch": "2.14.0",
+    "shap": "0.52.0"
+  }
+}

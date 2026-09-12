@@ -11,4 +11,6 @@ for k in range(2, 11):
     m = KMeans(n_clusters=k, n_init=10, random_state=42)
     lab = m.fit_predict(X_scaled)
     print(k, round(m.inertia_),
-          round(silhouette_score(X_scaled, lab), 3))
+          round(silhouette_score(
+              X_scaled, lab, sample_size=2000, random_state=42
+          ), 3))

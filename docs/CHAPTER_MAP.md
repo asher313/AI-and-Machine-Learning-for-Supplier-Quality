@@ -159,8 +159,8 @@ printed program output; they stay in the book.
 
 | File | Section(s) |
 |---|---|
-| `examples/ch07_the_five_methods_every_estimator_has.py` | 7.1 The Five Methods Every Estimator Has |
-| `examples/ch07_the_five_methods_every_estimator_has_2.py` | 7.1 The Five Methods Every Estimator Has |
+| `examples/ch07_the_five_methods_every_estimator_has.py` | 7.1 Five Common Estimator Methods |
+| `examples/ch07_the_five_methods_every_estimator_has_2.py` | 7.1 Five Common Estimator Methods |
 | `examples/ch07_the_eleven_step_template.py` | 7.2 The Eleven-Step Template |
 | `examples/ch07_scalers.py` | Scalers |
 | `examples/ch07_scalers_2.py` | Scalers |
@@ -484,3 +484,11 @@ listing for either and no listing imports them, so
 they are not invented here. Build 1's label logic is
 in `src/sqm_ai/build1/sql/labels.sql`.
 
+
+## Technical-review additions
+
+- Build 1 local CLI and model card: `docs/BUILD1_RUN.md`.
+- Synthetic fixture contracts and generation: `docs/SYNTHETIC_DATA.md`.
+- Chapter 12 reusable architectures: `src/sqm_ai/dl/architectures.py`.
+- Build 2 local walkthrough: `src/sqm_ai/cnc/run_build2.py`, shared preprocessing in `src/sqm_ai/cnc/preprocessing.py`, instructions in `docs/BUILD2_RUN.md`.
+- Review status: `docs/TECHNICAL_REVIEW_STATUS.md`.

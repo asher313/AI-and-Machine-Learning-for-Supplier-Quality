@@ -1,3 +1,6 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 # Chapter 12 — The residual block, and the key line
 class ResidualBlock(nn.Module):
     """Two convolutions plus a skip connection."""

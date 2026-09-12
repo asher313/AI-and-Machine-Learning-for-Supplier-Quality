@@ -1,3 +1,3 @@
 # Chapter 11 — 11.3 Autograd
-x.grad.zero_()         # by hand, for one tensor
-# in training: optimizer.zero_grad() clears every parameter
+x.grad = None         # reset one leaf tensor
+# optimizer.zero_grad() resets the optimizer-managed parameters

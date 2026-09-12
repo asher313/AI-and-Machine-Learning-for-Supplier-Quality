@@ -2,9 +2,9 @@
 -- Audit score change since the previous audit
 SELECT supplier_id, audit_date, audit_score,
        LAG(audit_score) OVER (
-         PARTITION BY supplier_id ORDER BY audit_date
+         PARTITION BY supplier_id ORDER BY audit_date, audit_id
        ) AS prev_score,
        audit_score - LAG(audit_score) OVER (
-         PARTITION BY supplier_id ORDER BY audit_date
+         PARTITION BY supplier_id ORDER BY audit_date, audit_id
        ) AS delta
 FROM sqm.audits;

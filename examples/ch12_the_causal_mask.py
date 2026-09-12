@@ -1,7 +1,7 @@
 # Chapter 12 — The causal mask
-def causal_mask(size: int) -> torch.Tensor:
+def causal_mask(size: int, device=None) -> torch.Tensor:
     """(1, 1, size, size); position i sees 0..i only."""
-    mask = torch.tril(torch.ones(size, size))
+    mask = torch.tril(torch.ones(size, size, dtype=torch.bool, device=device))
     return mask.unsqueeze(0).unsqueeze(0)
 
 

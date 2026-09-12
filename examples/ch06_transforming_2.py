@@ -7,6 +7,7 @@ df["grade"] = df["audit_score"].apply(
 # Vectorized: binning is what pd.cut is for
 df["grade"] = pd.cut(
     df["audit_score"],
-    bins=[0, 80, 90, 100],
+    bins=[0, 80, 90, 101],
     labels=["C", "B", "A"],
+    right=False,
 )

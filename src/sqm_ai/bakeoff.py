@@ -24,10 +24,10 @@ def evaluate(name, model, df, X, y):
     t0 = time.perf_counter()
     pipe = Pipeline([("prep", prep), ("model", model)])
     for tr, te in month_folds(df):
-        pipe.fit(X.loc[tr], y.loc[tr])
-        p = pipe.predict_proba(X.loc[te])[:, 1]
-        aucs.append(roc_auc_score(y.loc[te], p))
-        aps.append(average_precision_score(y.loc[te], p))
+        pipe.fit(X.iloc[tr], y.iloc[tr])
+        p = pipe.predict_proba(X.iloc[te])[:, 1]
+        aucs.append(roc_auc_score(y.iloc[te], p))
+        aps.append(average_precision_score(y.iloc[te], p))
     return {
         "model": name,
         "roc_auc": round(sum(aucs) / len(aucs), 3),
@@ -47,7 +47,8 @@ CONTENDERS = {
         n_estimators=500, max_features="sqrt", n_jobs=-1,
         class_weight="balanced_subsample", random_state=42),
     "sklearn hist gbm": HistGradientBoostingClassifier(
-        max_iter=400, learning_rate=0.05, random_state=42),
+        max_iter=400, learning_rate=0.05, random_state=42,
+        early_stopping=False),
     "xgboost": xgb.XGBClassifier(
         n_estimators=400, learning_rate=0.05, max_depth=5,
         subsample=0.8, colsample_bytree=0.8,

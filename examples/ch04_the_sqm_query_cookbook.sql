@@ -18,5 +18,5 @@ ranked AS (
 SELECT supplier_id, ncr_count,
        ROUND(100.0 * running_sum / total, 2) AS cumulative_pct
 FROM ranked
-WHERE running_sum <= 0.8 * total
+WHERE running_sum - ncr_count < 0.8 * total
 ORDER BY ncr_count DESC;

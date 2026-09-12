@@ -1,12 +1,15 @@
 # Chapter 11 — 11.8 Saving, Loading, Checkpointing, Exporting
 import torch
 
-model.eval()
-dummy = torch.randn(1, 20)         # one representative batch
+model = model.cpu().eval()
+dummy = torch.randn(2, 20)         # batch > 1 for dynamic export
+batch_dim = torch.export.Dim("batch", min=1)
 
-# TorchScript: trace the graph with a sample input
-traced = torch.jit.trace(model, dummy)
-traced.save("model_traced.pt")
+# Current PyTorch graph capture; deployment needs a runtime
+exported = torch.export.export(
+    model, (dummy,), dynamic_shapes=({0: batch_dim},),
+)
+torch.export.save(exported, "model.pt2")
 
 # ONNX: portable, runs outside PyTorch
 torch.onnx.export(
@@ -15,8 +18,6 @@ torch.onnx.export(
     "model.onnx",
     input_names=["input"],
     output_names=["output"],
-    dynamic_axes={
-        "input": {0: "batch"},
-        "output": {0: "batch"},
-    },
+    dynamo=True,
+    dynamic_shapes=({0: batch_dim},),
 )

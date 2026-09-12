@@ -9,7 +9,7 @@ checkpoint = {
 }
 torch.save(checkpoint, "checkpoint.pt")
 
-ck = torch.load("checkpoint.pt", weights_only=True)
+ck = torch.load("checkpoint.pt", map_location=device, weights_only=True)
 model.load_state_dict(ck["model_state_dict"])
 optimizer.load_state_dict(ck["optimizer_state_dict"])
 scheduler.load_state_dict(ck["scheduler_state_dict"])

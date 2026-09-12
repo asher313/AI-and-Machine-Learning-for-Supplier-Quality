@@ -32,7 +32,8 @@ class CNCWindowNet(nn.Module):
         return self.head(h).squeeze(-1)    # (batch,)
 
 
-net = CNCWindowNet()
-print(sum(p.numel() for p in net.parameters()))
-batch = torch.randn(8, 5, 512)
-print(net(batch).shape)
+if __name__ == "__main__":
+    net = CNCWindowNet()
+    print(sum(p.numel() for p in net.parameters()))
+    batch = torch.randn(8, 5, 512)
+    print(net(batch).shape)

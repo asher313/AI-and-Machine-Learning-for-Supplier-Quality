@@ -2,7 +2,7 @@
 import shap
 
 explainer = shap.TreeExplainer(model)
-sv = explainer.shap_values(X_test)   # (rows, features)
+sv = explainer.shap_values(X_test)   # binary XGBoost: raw margin
 
 shap.summary_plot(sv, X_test)        # global picture
 shap.force_plot(explainer.expected_value,

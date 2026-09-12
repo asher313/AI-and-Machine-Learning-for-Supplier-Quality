@@ -7,6 +7,6 @@ stages: [test]
 test:
   stage: test
   script:
-    - uv sync --frozen
+    - uv sync --locked
     - uv run ruff check src tests
     - uv run pytest

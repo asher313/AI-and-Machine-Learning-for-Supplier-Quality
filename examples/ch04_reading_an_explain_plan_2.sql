@@ -10,4 +10,5 @@ CREATE INDEX idx_ncrs_high_severity
 
 -- Expression index: for a function you filter by
 CREATE INDEX idx_ncrs_month
-  ON sqm.ncrs (DATE_TRUNC('month', discovered_at));
+  ON sqm.ncrs (DATE_TRUNC(
+    'month', discovered_at AT TIME ZONE 'UTC'));

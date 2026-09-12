@@ -1,3 +1,4 @@
+from sqm_ai.dl.architectures import scaled_dot_product_attention
 # Chapter 12 — Multi-head attention
 import torch
 import torch.nn as nn
@@ -13,7 +14,8 @@ class MultiHeadAttention(nn.Module):
         dropout: float = 0.1,
     ):
         super().__init__()
-        assert d_model % num_heads == 0
+        if d_model <= 0 or num_heads <= 0 or d_model % num_heads:
+            raise ValueError("positive width divisible by heads required")
         self.d_model = d_model
         self.num_heads = num_heads
         self.d_k = d_model // num_heads

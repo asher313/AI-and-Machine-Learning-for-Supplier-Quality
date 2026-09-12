@@ -9,10 +9,13 @@ from sklearn.metrics import (
     classification_report, confusion_matrix, roc_auc_score,
 )
 from sklearn.model_selection import (
-    cross_val_score, train_test_split,
+    cross_val_score,
 )
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from pathlib import Path
+
+from sqm_ai.features import month_folds
 
 # 1. Load
 df = pd.read_parquet("data/supplier_month.parquet")
@@ -57,10 +60,12 @@ pipeline = Pipeline([
         n_estimators=100, random_state=42, n_jobs=-1)),
 ])
 
-# 7. Hold out a test set (stratified: keep the class ratio)
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, stratify=y, random_state=42,
-)
+# 7. Reserve the latest three months; purge three before them
+months = sorted(df["month"].unique())
+train = df.loc[df["month"] < months[-6]].copy()
+test = df.loc[df["month"] >= months[-3]].copy()
+X_train, y_train = train[X.columns], train[TARGET]
+X_test, y_test = test[X.columns], test[TARGET]
 
 # 8. Fit
 pipeline.fit(X_train, y_train)
@@ -74,10 +79,12 @@ print(confusion_matrix(y_test, y_pred))
 
 # 10. Cross-validate for an honest estimate
 cv_auc = cross_val_score(
-    pipeline, X_train, y_train, cv=5, scoring="roc_auc")
+    pipeline, X_train, y_train,
+    cv=list(month_folds(train, n_splits=3)), scoring="roc_auc")
 print(f"CV AUC {cv_auc.mean():.4f} +/- {cv_auc.std():.4f}")
 
 # 11. Save the whole pipeline, not just the model
+Path("models").mkdir(exist_ok=True)
 joblib.dump(pipeline, "models/template_rf.joblib")
 json.dump({"cv_auc": float(cv_auc.mean())},
           open("models/template_rf_metrics.json", "w"))

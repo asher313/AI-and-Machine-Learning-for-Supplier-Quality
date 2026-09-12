@@ -1,17 +1,41 @@
 # src/sqm_ai/sql/extract_manifest.yaml
-# TODO(book): condensed in Chapter 5 — complete before production use.
 - source: SQM.V_SUPPLIERS
   target: sqm.suppliers
   watermark: changed_at
-  required: [supplier_id, supplier_name, tier, active]
+  required: [supplier_id, supplier_name, tier, active,
+             onboarded_at]
 - source: SQM.V_NCRS
   target: sqm.ncrs
   watermark: changed_at
-  required: [ncr_id, supplier_id, category, severity,
-             discovered_at]
+  required: [ncr_id, supplier_id, part_number, category,
+             severity, quantity, disposition, cost_impact_usd,
+             description, owner, discovered_at, closed_at]
 - source: SQM.V_CARS
   target: sqm.cars
   watermark: changed_at
-  required: [car_id, ncr_id, supplier_id, status]
-# (condensed: audits, inspections, purchase_orders,
-#  goods_receipts, bill_of_materials follow the same shape)
+  required: [car_id, ncr_id, supplier_id, root_cause,
+             containment, status, opened_at, closed_at]
+- source: SQM.V_AUDITS
+  target: sqm.audits
+  watermark: changed_at
+  required: [audit_id, supplier_id, audit_date, audit_score,
+             findings_count]
+- source: SQM.V_INSPECTIONS
+  target: sqm.inspections
+  watermark: changed_at
+  required: [inspection_id, goods_receipt_id, supplier_id,
+             part_number, inspected_at, passed]
+- source: SQM.V_PURCHASE_ORDERS
+  target: sqm.purchase_orders
+  watermark: changed_at
+  required: [po_line_id, supplier_id, part_number, quantity,
+             promised_date]
+- source: SQM.V_GOODS_RECEIPTS
+  target: sqm.goods_receipts
+  watermark: changed_at
+  required: [goods_receipt_id, po_line_id, supplier_id,
+             received_at, quantity]
+- source: SQM.V_BILL_OF_MATERIALS
+  target: sqm.bill_of_materials
+  watermark: changed_at
+  required: [part_id, parent_id, quantity]

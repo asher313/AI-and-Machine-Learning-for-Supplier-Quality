@@ -2,8 +2,8 @@
 import torch
 import torch.nn as nn
 
-# count positives 10x: a missed failure costs more than a
-# false alarm (Chapter 9 sets the number from the cost table)
+# illustrative training weight, tuned on development data;
+# not automatically the operating false-negative cost ratio
 pos_weight = torch.tensor([10.0])
 criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 

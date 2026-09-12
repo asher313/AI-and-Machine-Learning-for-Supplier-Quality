@@ -6,6 +6,6 @@ from sklearn.preprocessing import (
 
 scale = StandardScaler()             # mean 0, std 1
 scale = RobustScaler()               # median 0, IQR 1
-scale = MinMaxScaler((0, 1))         # bounded
+scale = MinMaxScaler((0, 1))         # training range
 scale = QuantileTransformer(
     output_distribution="normal", n_quantiles=200)

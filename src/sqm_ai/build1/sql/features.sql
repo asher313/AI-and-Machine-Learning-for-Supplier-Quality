@@ -1,24 +1,59 @@
 -- src/sqm_ai/build1/sql/features.sql
+-- Optional, independently governed source features. Absence stays NULL.
+CREATE TABLE IF NOT EXISTS sqm.supplier_feature_enrichment (
+  supplier_id text NOT NULL,
+  cutoff date NOT NULL,
+  spend_90d double precision,
+  car_response_days double precision,
+  car_effectiveness double precision,
+  PRIMARY KEY (supplier_id, cutoff)
+);
+
 CREATE OR REPLACE VIEW sqm.supplier_features AS
 SELECT
-  sm.supplier_id, sm.tier, sm.month,
-  s.onboarded_at,
-  SUM(sm.ncr_count)       OVER w3 AS ncr_count_90d,
-  SUM(sm.sev3_plus_count) OVER w3 AS sev3_count_90d,
-  AVG(sm.avg_severity)    OVER w3 AS avg_severity_90d,
-  SUM(sm.units_received)  OVER w3 AS units_received_90d,
-  SUM(sm.spend_usd)       OVER w3 AS spend_90d,
-  AVG(sm.otd)             OVER w3 AS otd_pct,
-  AVG(sm.days_late)       OVER w3 AS avg_days_late,
-  sm.fpy,
-  sm.audit_score                  AS audit_score_last,
-  sm.audit_date                   AS audit_date_last,
-  sm.car_response_days,
-  sm.car_effectiveness,
-  sm.open_cars
+  sm.supplier_id, sm.tier, sm.month, s.onboarded_at,
+  n.ncr_count_90d, n.sev3_count_90d, n.avg_severity_90d,
+  r.units_received_90d, e.spend_90d,
+  r.otd_pct, r.avg_days_late, sm.fpy,
+  a.audit_score AS audit_score_last,
+  a.audit_date AS audit_date_last,
+  e.car_response_days, e.car_effectiveness, sm.open_cars
 FROM sqm.supplier_month sm
 JOIN sqm.suppliers s USING (supplier_id)
-WINDOW w3 AS (
-  PARTITION BY sm.supplier_id ORDER BY sm.month
-  ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
-);
+CROSS JOIN LATERAL (
+  SELECT sm.month + INTERVAL '1 month' AS cutoff
+) c
+CROSS JOIN LATERAL (
+  SELECT COUNT(*) AS ncr_count_90d,
+    COUNT(*) FILTER (WHERE severity >= 3) AS sev3_count_90d,
+    AVG(severity) AS avg_severity_90d
+  FROM sqm.ncrs n
+  WHERE n.supplier_id = sm.supplier_id
+    AND n.discovered_at >= c.cutoff - INTERVAL '90 days'
+    AND n.discovered_at < c.cutoff
+) n
+CROSS JOIN LATERAL (
+  SELECT CASE WHEN COUNT(*) = 0 THEN 0
+              WHEN COUNT(g.quantity) = COUNT(*)
+              THEN SUM(g.quantity) END AS units_received_90d,
+    CASE WHEN COUNT(p.promised_date) = COUNT(*) THEN
+      AVG((g.received_at::date <= p.promised_date)::int)
+    END AS otd_pct,
+    CASE WHEN COUNT(p.promised_date) = COUNT(*) THEN
+      AVG(GREATEST(g.received_at::date - p.promised_date, 0))
+    END AS avg_days_late
+  FROM sqm.goods_receipts g
+  JOIN sqm.purchase_orders p ON p.po_line_id = g.po_line_id
+  WHERE g.supplier_id = sm.supplier_id
+    AND g.received_at >= c.cutoff - INTERVAL '90 days'
+    AND g.received_at < c.cutoff
+) r
+LEFT JOIN LATERAL (
+  SELECT audit_score, audit_date FROM sqm.audits a
+  WHERE a.supplier_id = sm.supplier_id
+    AND a.audit_date < c.cutoff
+  ORDER BY audit_date DESC, audit_id DESC LIMIT 1
+) a ON TRUE
+LEFT JOIN sqm.supplier_feature_enrichment e
+  ON e.supplier_id = sm.supplier_id
+ AND e.cutoff = c.cutoff::date;

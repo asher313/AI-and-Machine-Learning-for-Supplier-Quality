@@ -1,3 +1,8 @@
+import math
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from sqm_ai.dl.architectures import PositionalEncoding, TransformerBlock, causal_mask
 # Chapter 12 — The block, and the model
 class Transformer(nn.Module):
     """Token ids in, logits over the vocabulary out."""
@@ -33,7 +38,9 @@ class Transformer(nn.Module):
         self.output = nn.Linear(d_model, vocab_size)
 
     def forward(self, x: torch.Tensor, mask=None):
-        # x: (B, T) token ids
+        # x: (B, T), unpadded or right-padded token IDs
+        causal = causal_mask(x.size(1), device=x.device)
+        mask = causal if mask is None else causal & mask.to(x.device).bool()
         h = self.token_embedding(x)
         h = h * math.sqrt(self.d_model)
         h = self.dropout(self.positional_encoding(h))
@@ -50,11 +57,20 @@ class Transformer(nn.Module):
         temperature: float = 1.0,
     ) -> torch.Tensor:
         """Sample tokens one at a time, autoregressively."""
+        if not math.isfinite(temperature) or temperature < 0:
+            raise ValueError("temperature must be finite and nonnegative")
+        if max_new_tokens < 0 or start_ids.ndim != 2 or start_ids.size(1) == 0:
+            raise ValueError("nonempty (B, T) prompt and nonnegative length required")
+        if start_ids.size(1) + max_new_tokens > self.positional_encoding.pe.size(1):
+            raise ValueError("requested sequence exceeds context capacity")
         self.eval()
         ids = start_ids
         for _ in range(max_new_tokens):
-            logits = self(ids)[:, -1, :] / temperature
-            probs = F.softmax(logits, dim=-1)
-            nxt = torch.multinomial(probs, num_samples=1)
+            logits = self(ids)[:, -1, :]
+            if temperature == 0:
+                nxt = logits.argmax(dim=-1, keepdim=True)
+            else:
+                probs = F.softmax(logits / temperature, dim=-1)
+                nxt = torch.multinomial(probs, num_samples=1)
             ids = torch.cat([ids, nxt], dim=1)
         return ids

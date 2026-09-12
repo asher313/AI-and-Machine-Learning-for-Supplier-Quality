@@ -11,7 +11,9 @@ def bootstrap_ci(
     alpha: float = 0.05,
     seed: int = 0,
 ) -> tuple[float, float]:
-    """Percentile bootstrap CI for any statistic."""
+    """Percentile CI for a statistic of independent rows."""
+    if n_boot < 1 or not 0 < alpha < 1:
+        raise ValueError("n_boot > 0 and 0 < alpha < 1 required")
     rng = np.random.default_rng(seed)
     n = len(data)
     if n < 2:
@@ -33,7 +35,11 @@ def bootstrap_diff_ci(
     alpha: float = 0.05,
     seed: int = 0,
 ) -> tuple[float, float]:
-    """CI for stat_fn(b) - stat_fn(a); resample each group."""
+    """Difference CI for two independent groups."""
+    if min(len(a), len(b)) < 2:
+        raise ValueError("need two observations in each group")
+    if n_boot < 1 or not 0 < alpha < 1:
+        raise ValueError("n_boot > 0 and 0 < alpha < 1 required")
     rng = np.random.default_rng(seed)
     out = np.empty(n_boot)
     for i in range(n_boot):
