@@ -2,7 +2,7 @@
 import pandas as pd
 
 df = pd.read_csv(
-    "ncrs_2025-09_2026-08.csv",
+    "data/ncrs_2025-09_2026-08.csv",
     parse_dates=["discovered_at", "closed_at"],
 )
 

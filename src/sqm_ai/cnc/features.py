@@ -12,14 +12,18 @@ BANDS = [(0.0, 1.0), (1.0, 2.5), (2.5, 5.0)]
 
 
 def aggregates(x: np.ndarray, name: str) -> dict:
-    """Six statistics for one channel."""
+    """Six statistics for one finite, nonempty channel."""
+    x = np.asarray(x, dtype=float)
+    if x.ndim != 1 or len(x) < 2 or not np.isfinite(x).all():
+        raise ValueError("need two finite samples")
+    constant = np.ptp(x) == 0
     return {
         f"{name}_mean": float(np.mean(x)),
         f"{name}_std": float(np.std(x)),
         f"{name}_min": float(np.min(x)),
         f"{name}_max": float(np.max(x)),
-        f"{name}_skew": float(stats.skew(x)),
-        f"{name}_kurt": float(stats.kurtosis(x)),
+        f"{name}_skew": 0.0 if constant else float(stats.skew(x)),
+        f"{name}_kurt": 0.0 if constant else float(stats.kurtosis(x)),
     }
 
 
@@ -30,8 +34,9 @@ def band_energy(x: np.ndarray, name: str) -> dict:
     freq = np.fft.rfftfreq(len(x), d=1.0 / FS)
     total = float(spec.sum()) + 1e-9
     out = {}
-    for lo, hi in BANDS:
-        sel = (freq >= lo) & (freq < hi)
+    for k, (lo, hi) in enumerate(BANDS):
+        upper = (freq <= hi) if k == len(BANDS)-1 else (freq < hi)
+        sel = (freq >= lo) & upper
         out[f"{name}_band_{lo}_{hi}"] = (
             float(spec[sel].sum()) / total
         )

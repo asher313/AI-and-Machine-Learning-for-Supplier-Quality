@@ -14,8 +14,9 @@ grounded in the company's own documents, a corrective-action
 drafting crew, and a compliance gateway that every language-model
 call in the estate passes through. The chapters build each layer
 of the Supplier Intelligence Stack in order, and every file here
-is the artifact one of those chapters produced. Nothing is a
-sketch: the code is the code the book prints.
+is the artifact one of those chapters produced. The repository contains runnable components and instructional
+listings. Some demonstrations require services or reader-supplied
+inputs; the setup and reproducibility notes identify those boundaries.
 
 ## The Supplier Intelligence Stack
 
@@ -105,6 +106,19 @@ cp .env.example .env
 the only approved way to reach it. In CI the same variables come
 from GitLab protected variables (Chapter 22); in the restricted
 enclave they come from AWS Secrets Manager (Chapter 23).
+
+### Synthetic teaching data
+
+Generate the textbook datasets locally; generated data stay out of Git:
+
+```bash
+uv run python scripts/generate_data.py
+uv run python -m sqm_ai.verify_synthetic --data data --cnc data/cnc
+```
+
+See [the reproducibility guide](docs/SYNTHETIC_DATA.md) for file contracts,
+exact descriptive figures, smaller runs, and the distinction between
+constructed examples and measured model performance.
 
 ### The database
 

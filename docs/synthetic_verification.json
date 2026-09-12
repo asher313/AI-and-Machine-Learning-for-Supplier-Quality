@@ -1,0 +1,26 @@
+{
+  "supplier": {
+    "status": "passed",
+    "ncr_rows": 29412,
+    "panel_rows": 62518,
+    "mature_rows": 57118,
+    "positives": 5483,
+    "cobalt_difference_ci": [
+      -0.0446,
+      -0.0161
+    ],
+    "cobalt_mean_ci": [
+      0.9083,
+      0.932
+    ]
+  },
+  "cnc": {
+    "status": "passed",
+    "cycles": 931240,
+    "failures": 5587,
+    "raw_cycles": 971000,
+    "unmatched": 39760,
+    "features": 51,
+    "pilot_windows": 40000
+  }
+}

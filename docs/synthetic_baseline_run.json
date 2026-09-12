@@ -1,0 +1,64 @@
+{
+  "synthetic": true,
+  "model": "LogisticRegression(C=1, class_weight=balanced, max_iter=2000)",
+  "split": "month_folds(n_splits=5, test_size=3, gap=3)",
+  "versions": {
+    "numpy": "2.5.3",
+    "pandas": "3.0.5",
+    "scipy": "1.18.1",
+    "scikit-learn": "1.9.1",
+    "pyarrow": "25.0.1"
+  },
+  "data_manifest": {
+    "generator_version": 1,
+    "seed": 20260911,
+    "synthetic": true,
+    "data_complete_through": "2026-09-01",
+    "supplier_month_rows": 62518,
+    "labeled_rows": 57118,
+    "positives": 5483,
+    "ncr_export_rows": 29412,
+    "files": {
+      "suppliers.parquet": "196583a46a45cbf86b669c7200e705521cc1c4dd4cd0ffdbaffafeefc9fa284b",
+      "ncrs.parquet": "1354be8afd2761de9341383a19c73baa0133891cae5edea3c35f9dd55854cea1",
+      "ncrs_2025-09_2026-08.csv": "c86f784cc7dceb10e6eeb4064be6c72386555c01c713dad66fa38a188b496d1e",
+      "supplier_month.parquet": "322e6a10bd0ad28400600952fa9b233a48b6b21ccd00b129657dca229870b7fd",
+      "supplier_month_features.parquet": "322e6a10bd0ad28400600952fa9b233a48b6b21ccd00b129657dca229870b7fd",
+      "supplier_month_all.parquet": "932edf7a313a358d8087435c93739881ee42c5bd15dbd0dff2b432d9d949ff62",
+      "cobalt_lot_fpy.csv": "c370ebf3fff2e2ccce7ca8128039363b0a793c64ec08a4b934e5a70a90c99a93"
+    }
+  },
+  "folds": [
+    {
+      "fold": 1,
+      "roc_auc": 0.975199313477132,
+      "average_precision": 0.5976979452118241,
+      "seconds": 0.054087250002339715
+    },
+    {
+      "fold": 2,
+      "roc_auc": 0.8218963892315688,
+      "average_precision": 0.27317706672465136,
+      "seconds": 0.036629541998991044
+    },
+    {
+      "fold": 3,
+      "roc_auc": 0.9080647594799875,
+      "average_precision": 0.635198889613965,
+      "seconds": 0.03881670799819403
+    },
+    {
+      "fold": 4,
+      "roc_auc": 0.9685646191864237,
+      "average_precision": 0.6942495565647306,
+      "seconds": 0.04639212500114809
+    },
+    {
+      "fold": 5,
+      "roc_auc": 0.9775988526402057,
+      "average_precision": 0.6632599171470417,
+      "seconds": 0.05034291599804419
+    }
+  ],
+  "interpretation": "Constructed-data execution result; no claim of real-world quality or agreement with fictional performance tables."
+}

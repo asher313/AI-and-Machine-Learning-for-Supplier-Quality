@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
-NCR_ID = re.compile(r"^NCR-\d{4}-\d{4}$")
+NCR_ID = re.compile(r"^NCR-\d{4}-\d{4,6}$")
 SUPPLIER_ID = re.compile(r"^S-\d{4}$")
 
 
@@ -20,13 +20,13 @@ class NCRInput(BaseModel):
     @field_validator("ncr_id")
     @classmethod
     def ncr_id_format(cls, v: str) -> str:
-        if not NCR_ID.match(v):
+        if not NCR_ID.fullmatch(v):
             raise ValueError("must look like NCR-2026-0042")
         return v
 
     @field_validator("supplier_id")
     @classmethod
     def supplier_id_format(cls, v: str) -> str:
-        if not SUPPLIER_ID.match(v):
+        if not SUPPLIER_ID.fullmatch(v):
             raise ValueError("supplier_id must look like S-0417")
         return v

@@ -11,5 +11,6 @@ print(by_supplier.head(3))
 
 # Pareto: how many suppliers cause 80% of all NCRs?
 cumulative = by_supplier.cumsum() / by_supplier.sum()
-vital_few = cumulative[cumulative <= 0.80]
+n_to_80 = int(cumulative.searchsorted(0.80)) + 1
+vital_few = by_supplier.iloc[:n_to_80]
 print(len(vital_few), "of", df["supplier_id"].nunique())
