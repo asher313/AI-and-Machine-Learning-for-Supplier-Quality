@@ -1,6 +1,8 @@
 """JSON-serializable workflow state plus validated role contracts."""
 
 import operator
+import hashlib
+import json
 from typing import Annotated, Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -55,6 +57,7 @@ class VerificationPlan(BaseModel):
 class ReviewDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
     actor_id: str
+    draft_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
     action: Literal["accept_draft", "reject", "provide_evidence"]
     note: str = Field(min_length=1)
     evidence: EvidenceBundle | None = None
@@ -74,6 +77,7 @@ class CarState(TypedDict, total=False):
     ncr_id: str
     supplier_id: str
     evidence: dict
+    run_scope: dict
     problem: dict
     root_cause: dict
     actions: dict
@@ -88,3 +92,26 @@ class CarState(TypedDict, total=False):
     status: str
     review_evidence: dict | None
     reviews: Annotated[list[dict], operator.add]
+
+
+def draft_revision(state):
+    """Bind a decision to the displayed draft, evidence and immutable run scope."""
+    payload = {
+        key: state.get(key)
+        for key in (
+            "draft",
+            "evidence",
+            "run_scope",
+            "failures",
+            "gaps",
+        )
+    }
+    return hashlib.sha256(
+        json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode()
+    ).hexdigest()

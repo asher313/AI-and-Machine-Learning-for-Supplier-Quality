@@ -4,7 +4,10 @@ from transformers import (
     AutoModelForCausalLM,
     BitsAndBytesConfig,
 )
-from peft import prepare_model_for_kbit_training
+from peft import (
+    LoraConfig, TaskType, get_peft_model,
+    prepare_model_for_kbit_training,
+)
 
 if not torch.cuda.is_available():
     raise RuntimeError("this QLoRA recipe targets a compatible CUDA GPU")
@@ -25,4 +28,19 @@ model = AutoModelForCausalLM.from_pretrained(
     device_map={"": 0},  # explicit single CUDA device for this recipe
 )
 model = prepare_model_for_kbit_training(model)
-# then attach LoRA exactly as above
+# Repeat the configuration so this CUDA example is self-contained.
+lora_config = LoraConfig(
+    task_type=TaskType.CAUSAL_LM,
+    r=16,
+    lora_alpha=32,
+    lora_dropout=0.05,
+    target_modules=["q_proj", "v_proj"],
+    bias="none",
+)
+model = get_peft_model(model, lora_config)
+from collections import Counter
+trainable_dtype_counts = Counter()
+for parameter in model.parameters():
+    if parameter.requires_grad:
+        trainable_dtype_counts[str(parameter.dtype)] += parameter.numel()
+print(dict(trainable_dtype_counts))

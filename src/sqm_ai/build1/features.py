@@ -96,9 +96,14 @@ def load_modelling_frame(df):
         raise ValueError("forward label not yet complete")
     if not df.sev3_next_90d.isin([0, 1]).all():
         raise ValueError("classification target must be binary")
-    if (df.harm_next_90d < 0).any():
+    if (
+        not np.isfinite(
+            df.harm_next_90d.to_numpy(dtype=float)
+        ).all()
+        or (df.harm_next_90d < 0).any()
+    ):
         raise ValueError(
-            "severity-sum target must be nonnegative"
+            "severity-sum target must be finite and nonnegative"
         )
     X = df[NUMERIC + CATEGORICAL].copy()
     if np.isinf(X[NUMERIC].to_numpy(dtype=float)).any():

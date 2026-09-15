@@ -15,6 +15,7 @@ from sqm_ai.car.state import (
     ProblemSections,
     ReviewDecision,
     VerificationPlan,
+    draft_revision,
 )
 from sqm_ai.llm import (
     MODELS,
@@ -84,6 +85,28 @@ class CarServices:
     reviewer_authorized: object
     data_classification: str = "unknown"
     role_caller: object = call_role
+    policy_version: str = "car-teaching-v2"
+    authorization_scope: str = "synthetic-only"
+
+    def scope(self):
+        if (
+            not self.policy_version
+            or not self.authorization_scope
+            or (
+                self.data_classification != "synthetic"
+                and self.authorization_scope == "synthetic-only"
+            )
+        ):
+            raise ValueError(
+                "explicit policy and authenticated authorization scope required"
+            )
+        return dict(
+            ncr_id=self.ncr_id,
+            supplier_id=self.supplier_id,
+            data_classification=self.data_classification,
+            policy_version=self.policy_version,
+            authorization_scope=self.authorization_scope,
+        )
 
     def check_scope(self, bundle):
         if (
@@ -206,10 +229,16 @@ def make_nodes(services):
         return {"draft": services.redactor.back(draft)}
 
     def review(state):
+        if state.get("run_scope") != services.scope():
+            raise PermissionError(
+                "checkpoint scope differs from authorized run"
+            )
+        revision = draft_revision(state)
         decision = ReviewDecision.model_validate(
             interrupt(
                 {
                     "ncr_id": services.ncr_id,
+                    "draft_revision": revision,
                     "draft": state.get("draft"),
                     "failures": state.get("failures", []),
                     "gaps": state.get("gaps", []),
@@ -217,6 +246,10 @@ def make_nodes(services):
                 }
             )
         )
+        if decision.draft_revision != revision:
+            raise ValueError(
+                "stale draft revision; review the current draft"
+            )
         # Must bind the decision to the authenticated human, not trust actor_id text alone.
         if not services.reviewer_authorized(decision):
             raise PermissionError("reviewer not authorized")

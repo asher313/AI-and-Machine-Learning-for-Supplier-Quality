@@ -60,11 +60,17 @@ def build(
         calls.append(request)
         if failure:
             raise failure
-        return response or {
-            "text": "Use the reviewed procedure [1].",
-            "stop_reason": "end_turn",
-            "charge": ".01",
-        }
+        return {
+            "model": "scripted",
+            "usage": {"input_tokens": 20, "output_tokens": 10},
+        } | (
+            response
+            or {
+                "text": "Use the reviewed procedure [1].",
+                "stop_reason": "end_turn",
+                "charge": ".01",
+            }
+        )
 
     endpoint = Endpoint(
         "synthetic-local",
@@ -421,3 +427,65 @@ def test_higher_capacity_endpoint_does_not_raise_output_authorization(
     args["enclave"] = "controlled"
     result = g.complete(**args)
     assert result.codes == ["GW-POST-MARK"] and result.blocked
+
+
+@pytest.mark.parametrize(
+    "change,code",
+    [
+        ({"model": "unapproved"}, "GW-RESPONSE-MODEL"),
+        ({"usage": None}, "GW-RESPONSE-USAGE"),
+        (
+            {"usage": {"input_tokens": -1, "output_tokens": 1}},
+            "GW-RESPONSE-USAGE",
+        ),
+        (
+            {"usage": {"input_tokens": {}, "output_tokens": 1}},
+            "GW-RESPONSE-USAGE",
+        ),
+        (
+            {"usage": {"input_tokens": True, "output_tokens": 1}},
+            "GW-RESPONSE-USAGE",
+        ),
+        (
+            {"usage": {"input_tokens": 2, "output_tokens": 9000}},
+            "GW-RESPONSE-USAGE",
+        ),
+        ({"text": "x" * 300000}, "GW-RESPONSE-SIZE"),
+        ({"charge": "NaN"}, "GW-UPSTREAM"),
+        ({"charge": "-.01"}, "GW-UPSTREAM"),
+    ],
+)
+def test_bad_endpoint_evidence_retains_uncertain_reservation(
+    tmp_path, change, code
+):
+    response = {
+        "text": "Reviewed [1]",
+        "stop_reason": "end_turn",
+        "charge": ".01",
+    } | change
+    g, args, calls, audit, ledger, _ = build(
+        tmp_path, response=response
+    )
+    result = g.complete(**args)
+    assert result.blocked and result.codes == [code]
+    assert ledger.settled[-1][1] is None
+    assert audit.events[-1]["event"] == "failed"
+
+
+def test_only_explicit_returned_alias_is_accepted(tmp_path):
+    from dataclasses import replace
+
+    g, args, _, _, _, _ = build(
+        tmp_path,
+        response={
+            "model": "resolved-version",
+            "text": "Reviewed [1]",
+            "stop_reason": "end_turn",
+            "charge": ".01",
+        },
+    )
+    endpoint = g.router.endpoints[("open", "standard")]
+    g.router.endpoints[("open", "standard")] = replace(
+        endpoint, returned_models=frozenset({"resolved-version"})
+    )
+    assert not g.complete(**args).blocked

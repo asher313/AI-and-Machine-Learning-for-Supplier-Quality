@@ -287,6 +287,7 @@ Named modules contain the assembled implementations. Small examples are teaching
 |---|---|
 | `src/sqm_ai/cnc/__init__.py` | Assembled companion implementation |
 | `src/sqm_ai/cnc/edge.py` | The edge scorer |
+| `src/sqm_ai/cnc/gate.py` | Build 2 frozen teaching acceptance policy and separately failing gate CLI |
 | `src/sqm_ai/cnc/export.py` | Export and parity |
 | `src/sqm_ai/cnc/features.py` | 14.4 Features From Signals |
 | `src/sqm_ai/cnc/preprocessing.py` | Assembled companion implementation |
@@ -337,7 +338,7 @@ Named modules contain the assembled implementations. Small examples are teaching
 | `src/sqm_ai/triage/storage.py` | Assembled companion implementation |
 | `src/sqm_ai/triage/taxonomy.md` | Assembled companion implementation |
 | `src/sqm_ai/triage/trace.py` | 16.7 Tracing Every Call |
-| `tests/data/golden_ncrs.json` | 2.4 / 16.9 — the three labelled examples the book prints |
+| `docs/BUILD3_RUN.md` | 2.4 / 16.9 — reader-supplied adjudicated golden-set contract; replay fixtures are not quality evidence |
 | `tests/triage/test_golden.py` | 16.9 Testing an LLM Classifier |
 | `tests/triage/test_pipeline.py` | 16.9 Testing an LLM Classifier |
 | `tests/triage/test_structure.py` | 16.9 Testing an LLM Classifier |
@@ -503,7 +504,7 @@ Named modules contain the assembled implementations. Small examples are teaching
 |---|---|
 | `LICENSE` | MIT, © 2026 Asher Nizamani |
 | `README.md` | this repository's front door |
-| `data/README.md` | what each generated data file is, and which of them the book prints |
+| `docs/SYNTHETIC_DATA.md` | generated datasets, numerical contracts and limitations |
 | `docker/README.md` | how to bring that database up |
 | `docker/docker-compose.yml` | assembled from Chapter 17.5's `CREATE EXTENSION vector` and Chapter 22.8's `postgres:16` service container |
 | `docs/CHAPTER_MAP.md` | this file |
@@ -518,3 +519,11 @@ Named modules contain the assembled implementations. Small examples are teaching
 ## Reproducibility and verification
 
 The `scripts/generate*_data.py` generators, `src/sqm_ai/synthetic.py`, `src/sqm_ai/cnc/synthetic.py`, `src/sqm_ai/verify_synthetic.py`, `docs/*_RUN.md` guides, and behavioral tests extend the printed listings into inspectable teaching workflows. See README for supported execution paths.
+
+## Additional evaluation and corrected examples
+
+| File | Chapter / purpose |
+|---|---|
+| `examples/ch16_narrative_trace.json` | 16 — Asher at Northlake; fictional review-only event transcript, not replay evidence |
+| `src/sqm_ai/build1/evaluation.py` | 10 — Monthly audit-policy metrics and reserved final-period rehearsal |
+| `docs/ENTERPRISE_READINESS.md` | 24 — Demonstrated behavior and operational evidence still required |

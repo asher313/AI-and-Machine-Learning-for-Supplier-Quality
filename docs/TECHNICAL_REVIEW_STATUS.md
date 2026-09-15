@@ -2,7 +2,7 @@
 
 All 24 chapters have received technical reading and correction passes. Cross-book reconciliation and final manuscript production are separate from software validation; this file does not certify publication layout or deployed operation.
 
-## Verified execution
+## Historical September 12 verified execution
 
 - Four requested numeric fixture families, with count, chronology, feature, and statistical contracts; generated data remain outside Git.
 - Default five-fold Build 1 training and 1,800-supplier scoring; a separate five-fold, 20-epoch MLP comparison. See [synthetic_build1_mlp_run.json](synthetic_build1_mlp_run.json).
@@ -15,11 +15,44 @@ All 24 chapters have received technical reading and correction passes. Cross-boo
 - Fresh `uv sync --locked --extra ml` installation on macOS. The 30-tree CI rehearsal trained five chronological folds and registered seven verified artifacts; its last fold passed the illustrative gate. Earlier folds did not all pass. No GitLab server pipeline or Linux-container execution is claimed.
 - Real Anthropic SDK pagination through a two-page HTTP mock; no live model availability claim.
 
-## Test counts
+## Historical test counts
 
 The final September 12, 2026 run with the isolated PostgreSQL server recorded **247 passed, 7 skipped, 5 deselected**. The earlier offline run without PostgreSQL recorded **230 passed, 23 skipped, 5 deselected** before the final pagination test was added. The seven remaining skips concern optional framework dependencies; the separate framework environment passed **14 tests**, including CAR persistence and the PostgreSQL history contract. These suites overlap and must not be added into a unique-test total. The final 247-test run includes Chapter 24’s two-page SDK pagination test. The final optional-framework rerun passed 14 tests. Final focused reconciliation checks are recorded in the review deliverable.
 
 Critical Ruff checks (`E9,F63,F7,F82`) passed for package, tests, scripts, and Lambda sources. This is not a claim that all formatting/style rules pass for instructional fragments.
+
+## September 15 correction verification
+
+The corrected canonical source passed the complete main ML/DL suite against
+an isolated PostgreSQL/pgvector server: **288 passed, 12 skipped, 5 deselected**.
+The SQLAlchemy connection used `postgresql+psycopg://`; the installed driver
+is psycopg 3, not psycopg2. Two skips concern the uninstalled Ragas evaluation
+extra; ten concern optional LangGraph/framework imports or CAR workflows.
+The separate locked framework environment passed **15 focused agent/CAR tests**,
+including persistent scope/revision checks and concurrent review serialization.
+These suites overlap and must not be added into a distinct-test total.
+
+The corrected full default CNC training/export/edge run still caught **0/32**
+failures with zero holds. The new `cnc-teaching-v1` predictive gate returned
+**exit 1** as expected, while software execution completed. The default edge
+scorer rejected the failed bundle; the explicit teaching override loaded it
+and retained `predictive_acceptance_passed: false`. Final source hashes matched
+the run record. This preserves the failed predictive result rather than tuning
+against the test set to force success.
+
+A fresh CAR CLI replay paused persistently and accepted an explicit revision-bound
+synthetic review in a separate process. Gateway replay against a fresh disposable
+database reproduced 33 PII blocks, 8 marking blocks and one allowed scripted
+response, with in-process archive reconstruction. New negative tests cover
+cross-scope/stale/concurrent CAR resumes; invalid model, usage, size and accounting
+responses; whole-cascade gate failure; and missing chapter-map paths. There were
+no paid generation calls, cloud deployments or production writes.
+
+Build 1 now retains predictions and monthly top-50 policy comparisons, with a
+separate reserved-period evaluation protocol described in `BUILD1_RUN.md`.
+The GitLab rehearsal's classifier screen remains development evidence at its
+0.04 threshold; it does not validate the separate 0.30 escalation rule or grant
+production approval.
 
 ## Limits of this evidence
 

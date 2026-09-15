@@ -39,4 +39,4 @@ class SupplierRiskNet(nn.Module):
 # print(sum(p.numel() for p in model.parameters()))
 # batch = torch.randn(32, 20)
 # logits = model(batch)               # (32,)
-# probs = torch.sigmoid(logits)       # probabilities
+# probs = torch.sigmoid(logits)       # model probability estimates; validate calibration

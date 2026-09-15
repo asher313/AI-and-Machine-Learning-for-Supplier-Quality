@@ -23,6 +23,10 @@ from sklearn.metrics import (
 )
 from sklearn.pipeline import Pipeline
 
+from sqm_ai.build1.evaluation import (
+    monthly_policy_report,
+    prediction_frame,
+)
 from sqm_ai.build1.features import load_modelling_frame
 from sqm_ai.features import month_folds, prep
 
@@ -121,9 +125,12 @@ def fit_regressor(X, y, tr, params=None):
 # SECTION: evaluation
 
 
-def run(df, reg_params=None, clf_params=None):
+def run(
+    df, reg_params=None, clf_params=None, return_predictions=False
+):
     X, y_clf, y_reg = load_modelling_frame(df)
     rows = []
+    predictions = []
     for k, (tr, te) in enumerate(month_folds(df), 1):
         first_cutoff = df.iloc[
             te
@@ -136,6 +143,9 @@ def run(df, reg_params=None, clf_params=None):
         h = np.maximum(0.0, reg.predict(X.iloc[te]))
         clf = fit_classifier(X, y_clf, df, tr, clf_params)
         p = clf.predict_proba(X.iloc[te])[:, 1]
+        fold_predictions = prediction_frame(df.iloc[te], h)
+        fold_predictions["fold"] = k
+        predictions.append(fold_predictions)
         rows.append(
             {
                 "fold": k,
@@ -155,7 +165,10 @@ def run(df, reg_params=None, clf_params=None):
                 "spearman": spearmanr(y_reg.iloc[te], h)[0],
             }
         )
-    return pd.DataFrame(rows)
+    metrics = pd.DataFrame(rows)
+    if return_predictions:
+        return metrics, pd.concat(predictions, ignore_index=True)
+    return metrics
 
 
 # SECTION: command line and persisted artifacts
@@ -189,7 +202,9 @@ def main():
     )
     if args.trees is not None and args.trees < 1:
         raise ValueError("trees must be positive")
-    metrics = run(df, override, override)
+    metrics, predictions = run(
+        df, override, override, return_predictions=True
+    )
     X, yc, yr = load_modelling_frame(df)
     idx = np.arange(len(df))
     reg = fit_regressor(X, yr, idx, override)
@@ -208,6 +223,18 @@ def main():
     metrics.to_json(
         args.output / "metrics.json", orient="records", indent=2
     )
+    predictions.to_parquet(
+        args.output / "development_predictions.parquet",
+        index=False,
+    )
+    policy_report = monthly_policy_report(predictions)
+    policy_report["evaluation_kind"] = (
+        "development folds; not independent post-selection evidence"
+    )
+    (args.output / "monthly_audit_policy.json").write_text(
+        json.dumps(policy_report, indent=2, allow_nan=False)
+        + "\n"
+    )
     (args.output / "threshold.json").write_text(
         json.dumps(
             {
@@ -225,6 +252,8 @@ def main():
         "risk_classifier_calibrated.joblib",
         "feature_list.json",
         "threshold.json",
+        "monthly_audit_policy.json",
+        "development_predictions.parquet",
     ]
     artifact_hashes = {
         name: hashlib.sha256(
@@ -237,6 +266,7 @@ def main():
         Path(__file__).with_name("features.py"),
         Path(__file__).with_name("score_suppliers.py"),
         Path(__file__).with_name("explain.py"),
+        Path(__file__).with_name("evaluation.py"),
         Path(__file__).parent.parent / "features.py",
     ]
     source_hashes = {
@@ -266,6 +296,7 @@ def main():
                 "artifact_sha256": artifact_hashes,
                 "source_sha256": source_hashes,
                 "trees_override": args.trees,
+                "evaluation_kind": "development folds; reserve a final period before model selection",
                 "intended_use": "Synthetic teaching demonstration; human review only",
             },
             indent=2,

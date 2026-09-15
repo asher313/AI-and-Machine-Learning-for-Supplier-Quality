@@ -25,6 +25,7 @@ from sqm_ai.cnc.preprocessing import (
 )
 from sqm_ai.cnc.train_stage1 import fit_stage1, metrics
 from sqm_ai.cnc.train_stage2 import fit_stage2
+from sqm_ai.cnc.gate import assess, evaluate_file
 
 
 def run(data, output, trees=500, epochs=30):
@@ -59,8 +60,7 @@ def run(data, output, trees=500, epochs=30):
     ]
     a, b, c, d = cut
     fit = df[
-        df.cycle_start.lt(a)
-        & df.inspection_completed_at.lt(a)
+        df.cycle_start.lt(a) & df.inspection_completed_at.lt(a)
     ]
     cal = df[
         df.cycle_start.ge(a)
@@ -161,9 +161,7 @@ def run(data, output, trees=500, epochs=30):
             "flags": int(holds.sum()),
             "failures": int(actual.sum()),
             "caught": int(actual[holds].sum()),
-            "recall": float(
-                actual[holds].sum() / actual.sum()
-            )
+            "recall": float(actual[holds].sum() / actual.sum())
             if actual.sum()
             else None,
             "precision": float(actual[holds].mean())
@@ -197,6 +195,7 @@ def run(data, output, trees=500, epochs=30):
         Path(__file__).with_name("train_stage1.py"),
         Path(__file__).with_name("train_stage2.py"),
         Path(__file__).with_name("edge.py"),
+        Path(__file__).with_name("gate.py"),
         Path(__file__).with_name("export.py"),
         Path(__file__).parent.parent / "dl/train.py",
         Path(__file__).parent.parent / "dl/cnc_cnn.py",
@@ -247,6 +246,7 @@ def run(data, output, trees=500, epochs=30):
         "channel_mean": mean.tolist(),
         "channel_scale": scale.tolist(),
         "sha256": hashes,
+        "predictive_acceptance": assess(record),
     }
     config["model_version"] = hashlib.sha256(
         json.dumps(config, sort_keys=True).encode()
@@ -254,10 +254,21 @@ def run(data, output, trees=500, epochs=30):
     (output / "bundle.json").write_text(
         json.dumps(config, indent=2) + "\n"
     )
+    (output / "predictive_acceptance.json").write_text(
+        json.dumps(
+            evaluate_file(
+                output / "metrics.json",
+                bundle=output / "bundle.json",
+            ),
+            indent=2,
+            allow_nan=False,
+        )
+        + "\n"
+    )
     # End-to-end: raw held-out rows must match in-process decisions.
     from sqm_ai.cnc.edge import CycleScorer
 
-    scorer = CycleScorer(output)
+    scorer = CycleScorer(output, allow_failed_demo=True)
     checks = np.unique(
         np.r_[
             np.arange(min(16, len(te))),
@@ -282,9 +293,20 @@ def run(data, output, trees=500, epochs=30):
         assert np.isclose(
             result["stage1_score"], p1[i], atol=1e-5
         )
-        assert (result["decision"] == "qa_hold") == bool(
-            holds[j]
+        assert (result["decision"] == "qa_hold") == bool(holds[j])
+    (output / "execution_status.json").write_text(
+        json.dumps(
+            {
+                "software_execution_passed": True,
+                "predictive_acceptance_passed": assess(record)[
+                    "passed"
+                ],
+                "production_approval": False,
+            },
+            indent=2,
         )
+        + "\n"
+    )
     print(json.dumps(record, indent=2))
     return record
 

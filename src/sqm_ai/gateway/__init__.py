@@ -7,6 +7,7 @@ import uuid
 
 from sqm_ai.gateway.audit import canonical, sha256
 from sqm_ai.gateway.guardrails import Guardrails
+from sqm_ai.gateway.router import money
 from sqm_ai.gateway.detectors import (
     MarkingDetector,
     required_enclave,
@@ -146,7 +147,7 @@ class Gateway:
                     request_text,
                     classification=classification,
                 )
-            quote = Decimal(str(endpoint.quote(request)))
+            quote = money(endpoint.quote(request))
             budget_state = self.ledger.reserve(trace_id, quote)
             reserved = True
             if budget_state == "soft":
@@ -164,9 +165,15 @@ class Gateway:
             response = endpoint.invoke(
                 request
             )  # Exactly one attempt; endpoint must disable hidden retries.
+            endpoint.validate_response(response, request)
             raw = canonical(response)
+            if (
+                len(raw.encode("utf-8"))
+                > endpoint.max_response_bytes
+            ):
+                raise PolicyViolation(["GW-RESPONSE-SIZE"])
             row["raw_response_hash"] = sha256(raw)
-            actual = Decimal(str(endpoint.charge(response)))
+            actual = money(endpoint.charge(response))
             within_quote = self.ledger.settle(trace_id, actual)
             finalized = True
             row["cost_usd"] = str(actual)

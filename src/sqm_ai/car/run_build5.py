@@ -10,6 +10,7 @@ from langgraph.types import Command
 from sqm_ai.car.graph import build_graph
 from sqm_ai.car.nodes import CarServices
 from sqm_ai.car.redact import Redactor
+from sqm_ai.car.state import draft_revision
 
 
 def replay_services(path):
@@ -69,6 +70,7 @@ def main():
             request = Command(
                 resume={
                     "actor_id": "synthetic-reviewer",
+                    "draft_revision": draft_revision(old.values),
                     "action": args.decision,
                     "note": "Explicit CLI decision in a fictional software replay.",
                     "evidence": None,

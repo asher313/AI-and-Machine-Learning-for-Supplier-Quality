@@ -92,3 +92,22 @@ Primary references checked September 11, 2026:
 - [NIST performance-threshold test design](https://www.nist.gov/publications/confirming-performance-threshold-binary-experimental-response)
 - [LangGraph interrupts](https://docs.langchain.com/oss/python/langgraph/interrupts)
 - [RapidFuzz Levenshtein distance](https://rapidfuzz.github.io/RapidFuzz/Usage/distance/Levenshtein.html)
+
+## Persisted run and review binding
+
+A run is bound to its NCR, supplier, data classification, policy version and
+authenticated authorization scope. The wrapper checks scope before returning
+checkpoint state or resuming. Production services must supply an explicit
+`authorization_scope`; the default is for synthetic data only. A decision
+must include the displayed `draft_revision` hash covering draft, evidence,
+scope, failures and gaps. Stale or unauthorized decisions are rejected before
+LangGraph persists resume values. Historical checkpoint overrides and arbitrary
+state updates are not exposed by this teaching wrapper.
+
+A separate local SQLite lock serializes reads/resumes across processes using
+the same checkpoint path; only one concurrent terminal decision succeeds.
+This is a local-filesystem teaching mechanism, not distributed locking.
+Existing checkpoints without scope metadata fail closed and need an explicit,
+reviewed migration or a new synthetic run. A production application must
+bind scope construction and reviewer callbacks to authenticated identity and
+current entitlements; a hash or caller-provided identity is not authorization.

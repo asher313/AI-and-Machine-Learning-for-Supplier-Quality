@@ -213,6 +213,7 @@ def test_bedrock_transports_normalize_into_gateway_endpoint():
         "messages": [{"role": "user", "content": "Test"}],
     }
     result = {
+        "model": config.model_id,
         "stop_reason": "end_turn",
         "content": [{"type": "text", "text": "Fixture answer"}],
         "usage": {"input_tokens": 4, "output_tokens": 3},

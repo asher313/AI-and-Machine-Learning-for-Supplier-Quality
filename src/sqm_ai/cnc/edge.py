@@ -12,10 +12,11 @@ from scipy.special import expit
 
 from sqm_ai.cnc.features import cycle_features, frame
 from sqm_ai.cnc.preprocessing import prepare_window, transform
+from sqm_ai.cnc.gate import assess
 
 
 class CycleScorer:
-    def __init__(self, artifact_dir):
+    def __init__(self, artifact_dir, *, allow_failed_demo=False):
         folder = Path(artifact_dir)
         self.config = json.loads(
             (folder / "bundle.json").read_text()
@@ -29,10 +30,20 @@ class CycleScorer:
                 != digest
             ):
                 raise ValueError("artifact checksum mismatch")
-        # Only load bundles from a trusted source; hashes do not confer trust.
-        self.prep = joblib.load(
-            folder / "preprocessing.joblib"
+        if "metrics.json" not in self.config["sha256"]:
+            raise ValueError(
+                "checksummed acceptance metrics required"
+            )
+        acceptance = assess(
+            json.loads((folder / "metrics.json").read_text())
         )
+        if not acceptance["passed"] and not allow_failed_demo:
+            raise ValueError(
+                "predictive acceptance failed; explicit allow_failed_demo=True is for teaching only"
+            )
+        self.predictive_acceptance_passed = acceptance["passed"]
+        # Only load bundles from a trusted source; hashes do not confer trust.
+        self.prep = joblib.load(folder / "preprocessing.joblib")
         self.s1 = ort.InferenceSession(
             str(folder / "stage1.onnx"),
             providers=["CPUExecutionProvider"],
@@ -42,9 +53,7 @@ class CycleScorer:
             providers=["CPUExecutionProvider"],
         )
 
-    def score(
-        self, window: np.ndarray, context: dict
-    ) -> dict:
+    def score(self, window: np.ndarray, context: dict) -> dict:
         cfg = self.config
         prepared = prepare_window(
             window, cfg["channel_mean"], cfg["channel_scale"]
@@ -55,6 +64,7 @@ class CycleScorer:
         if not np.isfinite(p1) or not 0 <= p1 <= 1:
             raise ValueError("invalid stage-1 score")
         result = {
+            "predictive_acceptance_passed": self.predictive_acceptance_passed,
             "model_version": cfg["model_version"],
             "stage1_score": p1,
             "stage2_score": None,

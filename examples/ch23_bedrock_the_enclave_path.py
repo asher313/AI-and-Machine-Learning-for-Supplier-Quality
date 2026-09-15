@@ -3,6 +3,7 @@ import json
 from sqm_ai.gateway.router import Endpoint
 from sqm_ai.aws.enclave import text_response
 
+
 def runtime_endpoint(config, *, quote, charge, client=None):
     if client is None:
         import boto3
@@ -37,4 +38,5 @@ def runtime_endpoint(config, *, quote, charge, client=None):
         invoke,
         quote,
         charge,
+        returned_models=config.returned_model_ids,
     )

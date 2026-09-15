@@ -5,9 +5,77 @@ from pathlib import Path
 import pytest
 
 from sqm_ai.car.redact import Redactor
+from sqm_ai.car.state import draft_revision
 from sqm_ai.car.root_cause import RootCauseSet, Why
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_resume_scope_revision_and_single_terminal_review(
+    services, tmp_path
+):
+    from dataclasses import replace
+    from concurrent.futures import ThreadPoolExecutor
+    from langgraph.types import Command
+    from sqm_ai.car.graph import build_graph
+
+    path = tmp_path / "scope.sqlite"
+    config = {"configurable": {"thread_id": "scope-test"}}
+    with build_graph(path, services) as app:
+        app.invoke({"ncr_id": services.ncr_id}, config)
+        revision = draft_revision(app.get_state(config).values)
+    for altered in (
+        replace(services, ncr_id="OTHER"),
+        replace(services, supplier_id="OTHER"),
+        replace(services, policy_version="new-policy"),
+        replace(services, authorization_scope="other-user"),
+    ):
+        with build_graph(path, altered) as app:
+            with pytest.raises(PermissionError):
+                app.get_state(config)
+            with pytest.raises(PermissionError):
+                app.invoke(Command(resume={}), config)
+    decision = dict(
+        actor_id="synthetic-reviewer",
+        action="accept_draft",
+        note="Reviewed this exact revision",
+        evidence=None,
+        draft_revision=revision,
+    )
+    with build_graph(path, services) as app:
+        with pytest.raises(ValueError, match="stale draft"):
+            app.invoke(
+                Command(
+                    resume=decision | {"draft_revision": "0" * 64}
+                ),
+                config,
+            )
+        with pytest.raises(ValueError, match="historical"):
+            app.get_state(
+                {
+                    "configurable": {
+                        "thread_id": "scope-test",
+                        "checkpoint_id": "old",
+                    }
+                }
+            )
+
+    def finish(_):
+        with build_graph(path, services) as app:
+            try:
+                return app.invoke(
+                    Command(resume=decision), config
+                )["status"]
+            except ValueError:
+                return "already-reviewed"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(finish, range(2))) == [
+            "accepted_draft",
+            "already-reviewed",
+        ]
+    with build_graph(path, services) as app:
+        assert len(app.get_state(config).values["reviews"]) == 1
 
 
 def load_module(path):
@@ -103,7 +171,17 @@ def test_review_persists_and_requires_authorized_explicit_resume(
             "note": "Reviewed this synthetic fixture",
             "evidence": None,
         }
-        final = app.invoke(Command(resume=decision), config)
+        final = app.invoke(
+            Command(
+                resume=decision
+                | {
+                    "draft_revision": draft_revision(
+                        app.get_state(config).values
+                    )
+                }
+            ),
+            config,
+        )
         assert final["status"] == "accepted_draft"
         assert not app.get_state(config).next
 
@@ -165,7 +243,17 @@ def test_gap_blocks_acceptance_and_new_evidence_reenters_research(
             "note": "Reviewed corrected source bundle",
             "evidence": original({}),
         }
-        second = app.invoke(Command(resume=decision), config)
+        second = app.invoke(
+            Command(
+                resume=decision
+                | {
+                    "draft_revision": draft_revision(
+                        app.get_state(config).values
+                    )
+                }
+            ),
+            config,
+        )
         assert not second["gaps"] and app.get_state(
             config
         ).next == ("review",)
@@ -203,7 +291,17 @@ def test_unauthorized_review_and_unresolved_gaps_cannot_be_accepted(
     ) as app:
         app.invoke({"ncr_id": services.ncr_id}, config)
         with pytest.raises(PermissionError):
-            app.invoke(Command(resume=decision), config)
+            app.invoke(
+                Command(
+                    resume=decision
+                    | {
+                        "draft_revision": draft_revision(
+                            app.get_state(config).values
+                        )
+                    }
+                ),
+                config,
+            )
     config = {
         "configurable": {"thread_id": "gapped"},
         "recursion_limit": 64,
@@ -212,7 +310,17 @@ def test_unauthorized_review_and_unresolved_gaps_cannot_be_accepted(
         app.invoke({"ncr_id": services.ncr_id}, config)
         decision["actor_id"] = "synthetic-reviewer"
         with pytest.raises(ValueError, match="resolve failures"):
-            app.invoke(Command(resume=decision), config)
+            app.invoke(
+                Command(
+                    resume=decision
+                    | {
+                        "draft_revision": draft_revision(
+                            app.get_state(config).values
+                        )
+                    }
+                ),
+                config,
+            )
 
 
 def test_recurrence_has_one_denominator_row_per_mature_car(db):

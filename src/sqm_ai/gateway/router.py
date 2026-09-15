@@ -16,6 +16,65 @@ class Endpoint:
     invoke: object
     quote: object  # Return a conservative Decimal token-charge estimate before dispatch.
     charge: object  # Compute actual supported token charges from returned usage.
+    returned_models: frozenset[str] = frozenset()
+    max_response_bytes: int = 262144
+
+    def __post_init__(self):
+        if (
+            not self.name
+            or not self.model
+            or type(self.max_response_bytes) is not int
+            or self.max_response_bytes < 1
+        ):
+            raise ValueError(
+                "named model and positive response byte cap required"
+            )
+        object.__setattr__(
+            self,
+            "returned_models",
+            frozenset(self.returned_models)
+            or frozenset({self.model}),
+        )
+
+    def validate_response(self, response, request):
+        """Generic text/usage contract before account-specific pricing is trusted.
+
+        Pricing callbacks must additionally reject unsupported billable components.
+        Returned aliases must be explicitly registered, never inferred from text.
+        """
+        if (
+            not isinstance(response, dict)
+            or response.get("model") not in self.returned_models
+        ):
+            raise PolicyViolation(["GW-RESPONSE-MODEL"])
+        usage = response.get("usage")
+        if (
+            not isinstance(usage, dict)
+            or not {"input_tokens", "output_tokens"}
+            <= usage.keys()
+        ):
+            raise PolicyViolation(["GW-RESPONSE-USAGE"])
+
+        def counters(value):
+            for name, count in value.items():
+                if name.endswith("_tokens"):
+                    if type(count) is not int or count < 0:
+                        raise PolicyViolation(
+                            ["GW-RESPONSE-USAGE"]
+                        )
+                elif isinstance(count, dict):
+                    counters(count)
+
+        counters(usage)
+        if usage["output_tokens"] > request["max_tokens"]:
+            raise PolicyViolation(["GW-RESPONSE-USAGE"])
+        text = response.get("text")
+        if (
+            isinstance(text, str)
+            and len(text.encode("utf-8"))
+            > self.max_response_bytes
+        ):
+            raise PolicyViolation(["GW-RESPONSE-SIZE"])
 
 
 class ModelRouter:

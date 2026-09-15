@@ -29,7 +29,7 @@ For valid raw windows and known cycle-start context:
 
 ```python
 from sqm_ai.cnc.edge import CycleScorer
-scorer = CycleScorer("artifacts/build2")
+scorer = CycleScorer("artifacts/build2", allow_failed_demo=True)
 # decision = scorer.score(window, context)
 ```
 
@@ -56,3 +56,29 @@ The 10 Hz traces demonstrate software handling of low-rate signals. They do
 not establish that audible chatter or any real machining defect is observable
 at that rate. Sensor semantics and bandwidth require a separate engineering
 measurement plan.
+
+## Separate predictive acceptance
+
+The default scorer refuses a bundle that fails the frozen `cnc-teaching-v1`
+acceptance policy or lacks checksummed metrics. `allow_failed_demo=True` is
+only for inspecting this failed synthetic model; returned decisions retain
+`predictive_acceptance_passed: false`.
+
+After training, inspect `execution_status.json` and `predictive_acceptance.json`:
+
+```bash
+python -m sqm_ai.cnc.gate --metrics artifacts/build2/metrics.json \
+  --bundle artifacts/build2/bundle.json \
+  --report artifacts/build2/predictive_acceptance.json
+```
+
+This command exits nonzero for the current synthetic model. Training's zero
+exit means software execution completed, not that predictive acceptance passed.
+The frozen educational policy checks stage-1 AP >=0.20, recall >=0.90,
+flag fraction <=0.05; full-cascade recall >=0.70, precision >=0.20 and
+flag fraction <=100/3800. It rejects undefined precision, inconsistent counts,
+non-finite metrics and fewer than 32 test failures. These are illustrative
+rejection floors, not established business requirements; 32 events is a
+demonstration floor, not a statistically justified sample size. A passing
+result still grants no production approval. Reports bind metrics and optional
+bundle bytes by SHA-256. There is no automatic CNC promotion service.

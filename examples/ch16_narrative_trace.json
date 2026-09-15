@@ -1,0 +1,37 @@
+{
+  "example_kind": "fictional narrative; not measured replay or model-quality evidence",
+  "routing_policy": "review-only until approved subset-error acceptance criteria pass",
+  "events": [
+    {
+      "event": "rules_applied",
+      "ncr_id": "NCR-2026-0042",
+      "rules_fired": [
+        "part_family"
+      ],
+      "complete": false,
+      "elapsed_ms": 4
+    },
+    {
+      "event": "llm_call",
+      "model": "claude-haiku-4-5-20251001",
+      "stage": "fast",
+      "input_tokens": 3423,
+      "cache_read": 0,
+      "output_tokens": 96,
+      "latency_ms": 730,
+      "cost_usd": 0.003903,
+      "input_hash": "9f2c4a17b0d3e881",
+      "trace_id": "c1f0…"
+    },
+    {
+      "event": "ncr_classified",
+      "ncr_id": "NCR-2026-0042",
+      "category": "dimensional",
+      "severity": 3,
+      "supplier_id": "S-0417",
+      "confidence": 0.91,
+      "routed": "review",
+      "elapsed_ms": 742
+    }
+  ]
+}

@@ -4,7 +4,7 @@
 
 Twenty-four chapters develop six supplier-quality systems at fictional Northlake Aerostructures. This repository contains the assembled code, instructional fragments, deterministic synthetic-data generators, behavioral tests, and run guides. The review corrects data leakage, label maturity, metrics, model/API compatibility, retrieval authorization, bounded tool execution, gateway accounting/auditing, and delivery examples while retaining the book’s progression.
 
-The examples are teaching implementations. Synthetic data and scripted model responses demonstrate specific calculations and software behavior; they do not establish real supplier risk, machining performance, regulatory compliance, or production readiness. **The full synthetic Build 2 run fails its prediction targets** despite completing training, ONNX parity, and edge execution. Its measured results are retained rather than forced to match fictional performance tables.
+The examples are teaching implementations. Synthetic data and scripted model responses demonstrate specific calculations and software behavior; they do not establish real supplier risk, machining performance, regulatory compliance, or production readiness. **The full synthetic Build 2 run fails its prediction targets** despite completing training, ONNX parity, and edge execution. Its measured results are retained rather than forced to match fictional performance tables. The separate CNC predictive gate exits nonzero, and the default scorer refuses this failed bundle; an explicit teaching-only override is documented in the Build 2 guide.
 
 ## Install the reviewed environment
 
@@ -70,7 +70,7 @@ uv run python -m sqm_ai.build1.score_suppliers --as-of 2026-09-01 --models model
 
 Live model-quality evaluation requires approved, adjudicated records, provider credentials, and explicit opt-in commands in the relevant run guide. Scripted replays are not golden-set accuracy tests. Never substitute generated response fixtures for independent quality evidence.
 
-[CI_RUN.md](docs/CI_RUN.md) explains the root seven-stage GitLab pipeline: critical lint, offline tests, generated data, Build 1 training, a validated final-fold gate, hashed artifact registration, and staging/production **rehearsal receipts**. It does not deploy an HTTP service. [CLOUD_RUN.md](docs/CLOUD_RUN.md) covers offline AWS contract tests and dry-run request files; real cloud execution needs actual configuration and explicit launch/submit flags. [SNAPSHOT_RUN.md](docs/SNAPSHOT_RUN.md) provides an offline model-catalog check and an optional live metadata check with distinct missing/failed states.
+[CI_RUN.md](docs/CI_RUN.md) explains the root seven-stage GitLab pipeline: critical lint, offline tests, generated data, Build 1 training, an illustrative development-fold screening gate, hashed artifact registration, and staging/production **rehearsal receipts**. It does not deploy an HTTP service. [CLOUD_RUN.md](docs/CLOUD_RUN.md) covers offline AWS contract tests and dry-run request files; real cloud execution needs actual configuration and explicit launch/submit flags. [SNAPSHOT_RUN.md](docs/SNAPSHOT_RUN.md) provides an offline model-catalog check and an optional live metadata check with distinct missing/failed states.
 
 The gateway is an injected library boundary. Applications must migrate their calls and enforce identity, credential, network, key-retention, and operational controls. It does not automatically intercept earlier direct SDK examples.
 
@@ -83,7 +83,7 @@ uv run pytest tests/test_synthetic.py
 # SQM_TEST_DATABASE_URL='postgresql+psycopg://USER@localhost/postgres' uv run pytest -m integration
 ```
 
-Missing optional dependencies and database configuration produce explicit skips. Database tests create and drop UUID-named test databases; use an isolated test server. The review’s main environment used the ML/DL/evaluation dependencies and ran the full offline suite; frameworks were verified separately. Paid/nightly quality evaluations and real cloud deployments were not run. Exact validation scope and measured synthetic runs are recorded in [TECHNICAL_REVIEW_STATUS.md](docs/TECHNICAL_REVIEW_STATUS.md).
+Missing optional dependencies and database configuration produce explicit skips. Database tests create and drop UUID-named test databases; use an isolated test server. The September 15 correction run used the locked ML/DL environment and PostgreSQL: 288 passed, 12 optional-dependency skips and 5 paid-test deselections. A separate focused framework/CAR run passed 15 tests; counts overlap. The earlier September 12 environment also included the evaluation extra. Paid/nightly quality evaluations and real cloud deployments were not run. Exact validation scope and measured synthetic runs are recorded in [TECHNICAL_REVIEW_STATUS.md](docs/TECHNICAL_REVIEW_STATUS.md).
 
 ## Navigate the code
 

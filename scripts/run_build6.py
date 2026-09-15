@@ -53,6 +53,7 @@ def main():
     def invoke(request):
         calls.append(request)
         return {
+            "model": "synthetic-response-v1",
             "text": "Follow the fictional reviewed procedure [1].",
             "stop_reason": "end_turn",
             "charge": ".01",

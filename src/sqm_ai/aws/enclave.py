@@ -15,6 +15,7 @@ class BedrockConfig:
     region: str
     model_id: str
     approved_levels: frozenset[str]
+    returned_model_ids: frozenset[str] = frozenset()
 
     def __post_init__(self):
         object.__setattr__(
@@ -65,6 +66,7 @@ def mantle_endpoint(config, *, quote, charge, client=None):
         invoke,
         quote,
         charge,
+        returned_models=config.returned_model_ids,
     )
 
 
@@ -102,4 +104,5 @@ def runtime_endpoint(config, *, quote, charge, client=None):
         invoke,
         quote,
         charge,
+        returned_models=config.returned_model_ids,
     )

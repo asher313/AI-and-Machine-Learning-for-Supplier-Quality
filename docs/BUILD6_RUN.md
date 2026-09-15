@@ -25,3 +25,23 @@ An operator registers each endpoint with its actual provider model ID, approved 
 The ledger locks a UTC calendar-month row before reserving, rounds amounts upward to eight decimal places, and refuses reservations that exceed the shared cap. Different cap settings for the same month fail closed. Policy cap changes require an explicit operator migration. A known charge above its quote is recorded and the response withheld; therefore this is an estimated-spend guard, not an invoice guarantee. Upstream failures retain an uncertain reservation. After checking provider billing evidence, an authorized operator may call `ledger.settle(trace_id, verified_amount, reconcile=True)`; persist that evidence in the organization's accounting audit. Never release a timeout reservation merely because no response arrived. Repeated acknowledgement of an identical settled charge is idempotent.
 
 `received` and `dispatch_intent` events precede execution; final events precede display. A process crash can leave a pending intent, and independent SQL/content/provider transactions cannot guarantee exactly-once execution or a final event. Reconcile pending traces. Audit outages suppress output; no sink can record a request during its own outage. Blocked request text is hashed but not archived. A response requiring a higher approved archive is withheld and recorded as an archive gap. Operational investigations need an approved escalation process for these gaps. Logical request/response reconstruction does not recreate provider internals or guarantee deterministic reruns.
+
+## Endpoint response and accounting contract
+
+An endpoint response must report an explicitly approved returned model ID
+(`Endpoint.returned_models`, defaulting to the requested model) and a usage
+mapping with nonnegative integer `input_tokens` and `output_tokens`. Boolean,
+missing, negative and non-finite token counters fail closed, including nested
+cache-token counters. Output usage cannot exceed the requested token cap.
+Serialized responses are bounded by `max_response_bytes` (262,144 by default).
+Malformed evidence is withheld and its reservation remains uncertain because
+dispatch may already have incurred cost. Returned aliases must be registered
+explicitly; Bedrock adapters expose `returned_model_ids` for this purpose.
+
+These generic checks do not implement account pricing. The operator's charge
+function must reject unsupported billable components and calculate charges from
+validated provider usage and reviewed account rates. Synthetic `charge` fields
+are accounting fixtures only. Negative or non-finite quote/charge values are
+rejected even when a custom ledger is injected. Valid known charges still settle
+before incomplete/blocked text is withheld. Network adapters must also bound
+received bytes and deadlines before materializing a response in memory.
